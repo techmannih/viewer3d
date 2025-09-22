@@ -266,6 +266,7 @@ export const platedHole = (
 
     const padWidth = plated_hole.rect_pad_width || holeWidth + 0.2
     const padHeight = plated_hole.rect_pad_height || holeHeight + 0.2
+    const rectBorderRadius = extractRectBorderRadius(plated_hole)
 
     const mainRect = cuboid({
       center: [plated_hole.x, plated_hole.y, 0],
@@ -290,14 +291,20 @@ export const platedHole = (
       height: 1.2,
     })
 
-    const topPad = cuboid({
+    const topPad = createRectPadGeom({
+      width: padWidth,
+      height: padHeight,
+      thickness: platedHoleLipHeight,
       center: [plated_hole.x, plated_hole.y, 1.2 / 2],
-      size: [padWidth, padHeight, platedHoleLipHeight],
+      borderRadius: rectBorderRadius,
     })
 
-    const bottomPad = cuboid({
+    const bottomPad = createRectPadGeom({
+      width: padWidth,
+      height: padHeight,
+      thickness: platedHoleLipHeight,
       center: [plated_hole.x, plated_hole.y, -1.2 / 2],
-      size: [padWidth, padHeight, platedHoleLipHeight],
+      borderRadius: rectBorderRadius,
     })
 
     const holeCut = union(
