@@ -1,4 +1,8 @@
 import type { PcbSmtPad } from "circuit-json"
+import {
+  clampRectBorderRadius,
+  extractRectBorderRadius,
+} from "./rect-border-radius"
 
 const RECT_PAD_SEGMENTS = 64
 
@@ -15,12 +19,7 @@ export function createRoundedRectPrism({
   thickness: number
   borderRadius?: number | null
 }) {
-  const normalizedRadius =
-    typeof borderRadius === "number" && borderRadius > 0 ? borderRadius : 0
-  const clampedRadius = Math.max(
-    0,
-    Math.min(normalizedRadius, width / 2, height / 2),
-  )
+  const clampedRadius = clampRectBorderRadius(width, height, borderRadius)
 
   if (clampedRadius <= 0) {
     return Manifold.cube([width, height, thickness], true)
@@ -70,8 +69,7 @@ export function createPadManifoldOp({
   padBaseThickness: number
 }) {
   if (pad.shape === "rect") {
-    const rectBorderRadius =
-      (pad as any).rect_border_radius ?? (pad as any).rectBorderRadius
+    const rectBorderRadius = extractRectBorderRadius(pad)
     return createRoundedRectPrism({
       Manifold,
       width: pad.width,

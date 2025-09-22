@@ -42,6 +42,10 @@ import { createSilkscreenTextGeoms } from "./geoms/create-geoms-for-silkscreen-t
 import { createSilkscreenPathGeom } from "./geoms/create-geoms-for-silkscreen-path"
 import { createGeom2FromBRep } from "./geoms/brep-converter"
 import type { GeomContext } from "./GeomContext"
+import {
+  clampRectBorderRadius,
+  extractRectBorderRadius,
+} from "./utils/rect-border-radius"
 
 const PAD_ROUNDED_SEGMENTS = 64
 
@@ -51,13 +55,10 @@ const createCenteredRectPadGeom = (
   thickness: number,
   rectBorderRadius?: number | null,
 ) => {
-  const normalizedRadius =
-    typeof rectBorderRadius === "number" && rectBorderRadius > 0
-      ? rectBorderRadius
-      : 0
-  const clampedRadius = Math.max(
-    0,
-    Math.min(normalizedRadius, width / 2, height / 2),
+  const clampedRadius = clampRectBorderRadius(
+    width,
+    height,
+    rectBorderRadius,
   )
 
   if (clampedRadius <= 0) {
@@ -490,8 +491,7 @@ export class BoardGeomBuilder {
     const layerSign = pad.layer === "bottom" ? -1 : 1
     const zPos = (layerSign * this.ctx.pcbThickness) / 2 + layerSign * M * 2 // Slightly offset from board surface
 
-    const rectBorderRadius =
-      (pad as any).rect_border_radius ?? (pad as any).rectBorderRadius
+    const rectBorderRadius = extractRectBorderRadius(pad)
 
     if (pad.shape === "rect") {
       const basePadGeom = createCenteredRectPadGeom(

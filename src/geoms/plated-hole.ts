@@ -11,6 +11,10 @@ import { M, colors } from "./constants"
 import type { GeomContext } from "../GeomContext"
 import { extrudeLinear } from "@jscad/modeling/src/operations/extrusions"
 import { translate } from "@jscad/modeling/src/operations/transforms"
+import {
+  clampRectBorderRadius,
+  extractRectBorderRadius,
+} from "../utils/rect-border-radius"
 
 const platedHoleLipHeight = 0.05
 const RECT_PAD_SEGMENTS = 64
@@ -28,12 +32,7 @@ const createRectPadGeom = ({
   center: [number, number, number]
   borderRadius?: number | null
 }) => {
-  const normalizedRadius =
-    typeof borderRadius === "number" && borderRadius > 0 ? borderRadius : 0
-  const clampedRadius = Math.max(
-    0,
-    Math.min(normalizedRadius, width / 2, height / 2),
-  )
+  const clampedRadius = clampRectBorderRadius(width, height, borderRadius)
 
   if (clampedRadius <= 0) {
     return cuboid({ center, size: [width, height, thickness] })
@@ -94,11 +93,7 @@ export const platedHole = (
   if (plated_hole.shape === "circular_hole_with_rect_pad") {
     const padWidth = plated_hole.rect_pad_width || plated_hole.hole_diameter
     const padHeight = plated_hole.rect_pad_height || plated_hole.hole_diameter
-    const rectBorderRadius =
-      plated_hole.rect_pad_border_radius ??
-      plated_hole.rectPadBorderRadius ??
-      plated_hole.rect_border_radius ??
-      plated_hole.rectBorderRadius
+    const rectBorderRadius = extractRectBorderRadius(plated_hole)
 
     return colorize(
       colors.copper,
