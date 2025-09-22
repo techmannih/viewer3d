@@ -1,12 +1,51 @@
 import type { PCBPlatedHole } from "circuit-json"
 import type { Geom3 } from "@jscad/modeling/src/geometries/types"
-import { cuboid, cylinder } from "@jscad/modeling/src/primitives"
+import {
+  cuboid,
+  cylinder,
+  roundedRectangle,
+} from "@jscad/modeling/src/primitives"
 import { colorize } from "@jscad/modeling/src/colors"
 import { subtract, union } from "@jscad/modeling/src/operations/booleans"
 import { M, colors } from "./constants"
 import type { GeomContext } from "../GeomContext"
+import { extrudeLinear } from "@jscad/modeling/src/operations/extrusions"
+import { translate } from "@jscad/modeling/src/operations/transforms"
 
 const platedHoleLipHeight = 0.05
+const RECT_PAD_SEGMENTS = 64
+
+const createRectPadGeom = ({
+  width,
+  height,
+  thickness,
+  center,
+  borderRadius,
+}: {
+  width: number
+  height: number
+  thickness: number
+  center: [number, number, number]
+  borderRadius?: number | null
+}) => {
+  const clampedRadius = Math.max(
+    0,
+    Math.min(borderRadius ?? 0, width / 2, height / 2),
+  )
+
+  if (clampedRadius <= 0) {
+    return cuboid({ center, size: [width, height, thickness] })
+  }
+
+  const rect2d = roundedRectangle({
+    size: [width, height],
+    roundRadius: clampedRadius,
+    segments: RECT_PAD_SEGMENTS,
+  })
+  const extruded = extrudeLinear({ height: thickness }, rect2d)
+  const offsetZ = center[2] - thickness / 2
+  return translate([center[0], center[1], offsetZ], extruded)
+}
 
 export const platedHole = (
   plated_hole: PCBPlatedHole,
@@ -53,20 +92,32 @@ export const platedHole = (
   if (plated_hole.shape === "circular_hole_with_rect_pad") {
     const padWidth = plated_hole.rect_pad_width || plated_hole.hole_diameter
     const padHeight = plated_hole.rect_pad_height || plated_hole.hole_diameter
+    const rectBorderRadius =
+      plated_hole.rect_pad_border_radius ??
+      plated_hole.rectPadBorderRadius ??
+      plated_hole.rect_border_radius ??
+      plated_hole.rectBorderRadius ??
+      0
 
     return colorize(
       colors.copper,
       subtract(
         union(
           // Top rectangular pad
-          cuboid({
+          createRectPadGeom({
+            width: padWidth,
+            height: padHeight,
+            thickness: platedHoleLipHeight,
             center: [plated_hole.x, plated_hole.y, 1.2 / 2],
-            size: [padWidth, padHeight, platedHoleLipHeight],
+            borderRadius: rectBorderRadius,
           }),
           // Bottom rectangular pad
-          cuboid({
+          createRectPadGeom({
+            width: padWidth,
+            height: padHeight,
+            thickness: platedHoleLipHeight,
             center: [plated_hole.x, plated_hole.y, -1.2 / 2],
-            size: [padWidth, padHeight, platedHoleLipHeight],
+            borderRadius: rectBorderRadius,
           }),
           // Plated barrel around hole
           cylinder({

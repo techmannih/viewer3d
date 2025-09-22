@@ -3,6 +3,7 @@ import type { AnyCircuitElement, PcbPlatedHole } from "circuit-json"
 import { su } from "@tscircuit/circuit-json-util"
 import * as THREE from "three"
 import { createCircleHoleDrill, createPlatedHoleDrill } from "../hole-geoms"
+import { createRoundedRectPrism } from "../pad-geoms"
 import { manifoldMeshToThreeGeometry } from "../manifold-mesh-to-three-geometry"
 import {
   colors as defaultColors,
@@ -234,20 +235,32 @@ export function processPlatedHolesForManifold(
 
       const padWidth = ph.rect_pad_width ?? ph.hole_diameter
       const padHeight = ph.rect_pad_height ?? ph.hole_diameter
+      const rectBorderRadius =
+        (ph as any).rect_pad_border_radius ??
+        (ph as any).rectPadBorderRadius ??
+        (ph as any).rect_border_radius ??
+        (ph as any).rectBorderRadius ??
+        0
       const padThickness = DEFAULT_SMT_PAD_THICKNESS
 
-      const topPad = Manifold.cube(
-        [padWidth!, padHeight!, padThickness],
-        true,
-      ).translate([
+      const topPad = createRoundedRectPrism({
+        Manifold,
+        width: padWidth!,
+        height: padHeight!,
+        thickness: padThickness,
+        borderRadius: rectBorderRadius,
+      }).translate([
         0,
         0,
         pcbThickness / 2 + padThickness / 2 + MANIFOLD_Z_OFFSET,
       ])
-      const bottomPad = Manifold.cube(
-        [padWidth!, padHeight!, padThickness],
-        true,
-      ).translate([
+      const bottomPad = createRoundedRectPrism({
+        Manifold,
+        width: padWidth!,
+        height: padHeight!,
+        thickness: padThickness,
+        borderRadius: rectBorderRadius,
+      }).translate([
         0,
         0,
         -pcbThickness / 2 - padThickness / 2 - MANIFOLD_Z_OFFSET,
