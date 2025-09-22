@@ -28,9 +28,11 @@ const createRectPadGeom = ({
   center: [number, number, number]
   borderRadius?: number | null
 }) => {
+  const normalizedRadius =
+    typeof borderRadius === "number" && borderRadius > 0 ? borderRadius : 0
   const clampedRadius = Math.max(
     0,
-    Math.min(borderRadius ?? 0, width / 2, height / 2),
+    Math.min(normalizedRadius, width / 2, height / 2),
   )
 
   if (clampedRadius <= 0) {
@@ -96,8 +98,7 @@ export const platedHole = (
       plated_hole.rect_pad_border_radius ??
       plated_hole.rectPadBorderRadius ??
       plated_hole.rect_border_radius ??
-      plated_hole.rectBorderRadius ??
-      0
+      plated_hole.rectBorderRadius
 
     return colorize(
       colors.copper,

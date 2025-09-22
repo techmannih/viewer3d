@@ -15,9 +15,11 @@ export function createRoundedRectPrism({
   thickness: number
   borderRadius?: number | null
 }) {
+  const normalizedRadius =
+    typeof borderRadius === "number" && borderRadius > 0 ? borderRadius : 0
   const clampedRadius = Math.max(
     0,
-    Math.min(borderRadius ?? 0, width / 2, height / 2),
+    Math.min(normalizedRadius, width / 2, height / 2),
   )
 
   if (clampedRadius <= 0) {
@@ -69,7 +71,7 @@ export function createPadManifoldOp({
 }) {
   if (pad.shape === "rect") {
     const rectBorderRadius =
-      (pad as any).rect_border_radius ?? (pad as any).rectBorderRadius ?? 0
+      (pad as any).rect_border_radius ?? (pad as any).rectBorderRadius
     return createRoundedRectPrism({
       Manifold,
       width: pad.width,

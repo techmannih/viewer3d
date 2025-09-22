@@ -49,11 +49,15 @@ const createCenteredRectPadGeom = (
   width: number,
   height: number,
   thickness: number,
-  rectBorderRadius: number,
+  rectBorderRadius?: number | null,
 ) => {
+  const normalizedRadius =
+    typeof rectBorderRadius === "number" && rectBorderRadius > 0
+      ? rectBorderRadius
+      : 0
   const clampedRadius = Math.max(
     0,
-    Math.min(rectBorderRadius, width / 2, height / 2),
+    Math.min(normalizedRadius, width / 2, height / 2),
   )
 
   if (clampedRadius <= 0) {
@@ -487,7 +491,7 @@ export class BoardGeomBuilder {
     const zPos = (layerSign * this.ctx.pcbThickness) / 2 + layerSign * M * 2 // Slightly offset from board surface
 
     const rectBorderRadius =
-      (pad as any).rect_border_radius ?? (pad as any).rectBorderRadius ?? 0
+      (pad as any).rect_border_radius ?? (pad as any).rectBorderRadius
 
     if (pad.shape === "rect") {
       const basePadGeom = createCenteredRectPadGeom(

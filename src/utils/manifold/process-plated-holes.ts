@@ -239,8 +239,7 @@ export function processPlatedHolesForManifold(
         (ph as any).rect_pad_border_radius ??
         (ph as any).rectPadBorderRadius ??
         (ph as any).rect_border_radius ??
-        (ph as any).rectBorderRadius ??
-        0
+        (ph as any).rectBorderRadius
       const padThickness = DEFAULT_SMT_PAD_THICKNESS
 
       const topPad = createRoundedRectPrism({
