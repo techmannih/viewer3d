@@ -27,6 +27,7 @@ export function processViasForManifold(
   circuitJson: AnyCircuitElement[],
   pcbThickness: number,
   manifoldInstancesForCleanup: any[],
+  boardClipOp?: any,
 ): ProcessViasResult {
   const viaBoardDrills: any[] = []
   const pcbVias = su(circuitJson).pcb_via.list() as PcbVia[]
@@ -35,6 +36,13 @@ export function processViasForManifold(
     geometry: THREE.BufferGeometry
     color: THREE.Color
   }> = []
+
+  const clipWithBoard = (op: any) => {
+    if (!boardClipOp) return op
+    const clipped = op.intersect(boardClipOp)
+    manifoldInstancesForCleanup.push(clipped)
+    return clipped
+  }
 
   pcbVias.forEach((via: PcbVia, index: number) => {
     // Board cut for vias
@@ -68,8 +76,9 @@ export function processViasForManifold(
         segments: SMOOTH_CIRCLE_SEGMENTS,
       })
       manifoldInstancesForCleanup.push(translatedViaCopper)
+      const clippedViaCopper = clipWithBoard(translatedViaCopper)
       const threeGeom = manifoldMeshToThreeGeometry(
-        translatedViaCopper.getMesh(),
+        clippedViaCopper.getMesh(),
       )
       viaCopperGeoms.push({
         key: `via-${via.pcb_via_id || index}`,
