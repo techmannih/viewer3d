@@ -93,14 +93,11 @@ export const platedHole = (
 
     const copperSolid = maybeClip(union(barrel, topLip, bottomLip), clipGeom)
 
-    const drill = maybeClip(
-      cylinder({
-        center: [plated_hole.x, plated_hole.y, 0],
-        radius: plated_hole.hole_diameter / 2 - M,
-        height: 1.5,
-      }),
-      clipGeom,
-    )
+    const drill = cylinder({
+      center: [plated_hole.x, plated_hole.y, 0],
+      radius: plated_hole.hole_diameter / 2 - M,
+      height: 1.5,
+    })
 
     return colorize(colors.copper, subtract(copperSolid, drill))
   }
@@ -137,14 +134,11 @@ export const platedHole = (
       clipGeom,
     )
 
-    const drill = maybeClip(
-      cylinder({
-        center: [plated_hole.x, plated_hole.y, 0],
-        radius: Math.max(plated_hole.hole_diameter / 2 - M, 0.01),
-        height: 1.5,
-      }),
-      clipGeom,
-    )
+    const drill = cylinder({
+      center: [plated_hole.x, plated_hole.y, 0],
+      radius: Math.max(plated_hole.hole_diameter / 2 - M, 0.01),
+      height: 1.5,
+    })
 
     return colorize(colors.copper, subtract(copperSolid, drill))
   }
@@ -268,7 +262,7 @@ export const platedHole = (
       union(barrelUnion, topLipUnion, bottomLipUnion),
       clipGeom,
     )
-    const drill = maybeClip(drillUnion, clipGeom)
+    const drill = drillUnion
 
     return colorize(colors.copper, subtract(copperSolid, drill))
     // biome-ignore lint/style/noUselessElse: <explanation>
@@ -354,7 +348,7 @@ export const platedHole = (
       union(mainRect, leftCap, rightCap, topPad, bottomPad),
       clipGeom,
     )
-    const drill = maybeClip(holeCut, clipGeom)
+    const drill = holeCut
 
     return colorize(colors.copper, subtract(copperSolid, drill))
   } else {
