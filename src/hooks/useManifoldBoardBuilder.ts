@@ -153,9 +153,19 @@ export const useManifoldBoardBuilder = (
       const clipThickness = currentPcbThickness + 2 * BOARD_CLIP_Z_MARGIN
       let boardClipVolume: any | null = null
 
+      const BOARD_CLIP_XY_OUTSET = 0.01
+
       if (outlineCrossSection) {
+        let clipCrossSection = outlineCrossSection
+        if (BOARD_CLIP_XY_OUTSET > 0) {
+          const inflatedCrossSection =
+            outlineCrossSection.offset(BOARD_CLIP_XY_OUTSET)
+          manifoldInstancesForCleanup.current.push(inflatedCrossSection)
+          clipCrossSection = inflatedCrossSection
+        }
+
         const clipOp = Manifold.extrude(
-          outlineCrossSection,
+          clipCrossSection,
           clipThickness,
           undefined,
           undefined,
@@ -165,8 +175,10 @@ export const useManifoldBoardBuilder = (
         manifoldInstancesForCleanup.current.push(clipOp)
         boardClipVolume = clipOp
       } else {
+        const clipWidth = (boardData.width || 0) + 2 * BOARD_CLIP_XY_OUTSET
+        const clipHeight = (boardData.height || 0) + 2 * BOARD_CLIP_XY_OUTSET
         const clipCube = Manifold.cube(
-          [boardData.width || 0, boardData.height || 0, clipThickness],
+          [clipWidth, clipHeight, clipThickness],
           true,
         )
         manifoldInstancesForCleanup.current.push(clipCube)
