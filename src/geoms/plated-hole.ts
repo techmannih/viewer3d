@@ -6,7 +6,11 @@ import {
   roundedRectangle,
 } from "@jscad/modeling/src/primitives"
 import { colorize } from "@jscad/modeling/src/colors"
-import { subtract, union } from "@jscad/modeling/src/operations/booleans"
+import {
+  intersect,
+  subtract,
+  union,
+} from "@jscad/modeling/src/operations/booleans"
 import { M, colors } from "./constants"
 import type { GeomContext } from "../GeomContext"
 import { extrudeLinear } from "@jscad/modeling/src/operations/extrusions"
@@ -18,6 +22,9 @@ import {
 
 const platedHoleLipHeight = 0.05
 const RECT_PAD_SEGMENTS = 64
+
+const maybeClip = (geom: Geom3, clipGeom?: Geom3 | null) =>
+  clipGeom ? intersect(clipGeom, geom) : geom
 
 const createRectPadGeom = ({
   width,
@@ -48,88 +55,98 @@ const createRectPadGeom = ({
   return translate([center[0], center[1], offsetZ], extruded)
 }
 
+type PlatedHoleOptions = {
+  clipGeom?: Geom3 | null
+}
+
 export const platedHole = (
   plated_hole: PCBPlatedHole,
   ctx: GeomContext,
+  options: PlatedHoleOptions = {},
 ): Geom3 => {
+  const { clipGeom } = options
   if (!(plated_hole as PCBPlatedHole).shape) plated_hole.shape = "circle"
   if (plated_hole.shape === "circle") {
-    return colorize(
-      colors.copper,
-      subtract(
-        union(
-          cylinder({
-            center: [plated_hole.x, plated_hole.y, 0],
-            radius: plated_hole.hole_diameter / 2,
-            height: ctx.pcbThickness,
-          }),
-          cylinder({
-            center: [
-              plated_hole.x,
-              plated_hole.y,
-              ctx.pcbThickness / 2 + platedHoleLipHeight / 2 + M,
-            ],
-            radius: plated_hole.outer_diameter / 2,
-            height: platedHoleLipHeight,
-          }),
-          cylinder({
-            center: [
-              plated_hole.x,
-              plated_hole.y,
-              -ctx.pcbThickness / 2 - platedHoleLipHeight / 2 - M,
-            ],
-            radius: plated_hole.outer_diameter / 2,
-            height: platedHoleLipHeight,
-          }),
-        ),
-        cylinder({
-          center: [plated_hole.x, plated_hole.y, 0],
-          radius: plated_hole.hole_diameter / 2 - M,
-          height: 1.5,
-        }),
-      ),
+    const barrel = cylinder({
+      center: [plated_hole.x, plated_hole.y, 0],
+      radius: plated_hole.hole_diameter / 2,
+      height: ctx.pcbThickness,
+    })
+    const topLip = cylinder({
+      center: [
+        plated_hole.x,
+        plated_hole.y,
+        ctx.pcbThickness / 2 + platedHoleLipHeight / 2 + M,
+      ],
+      radius: plated_hole.outer_diameter / 2,
+      height: platedHoleLipHeight,
+    })
+    const bottomLip = cylinder({
+      center: [
+        plated_hole.x,
+        plated_hole.y,
+        -ctx.pcbThickness / 2 - platedHoleLipHeight / 2 - M,
+      ],
+      radius: plated_hole.outer_diameter / 2,
+      height: platedHoleLipHeight,
+    })
+
+    const copperSolid = maybeClip(union(barrel, topLip, bottomLip), clipGeom)
+
+    const drill = maybeClip(
+      cylinder({
+        center: [plated_hole.x, plated_hole.y, 0],
+        radius: plated_hole.hole_diameter / 2 - M,
+        height: 1.5,
+      }),
+      clipGeom,
     )
+
+    return colorize(colors.copper, subtract(copperSolid, drill))
   }
   if (plated_hole.shape === "circular_hole_with_rect_pad") {
     const padWidth = plated_hole.rect_pad_width || plated_hole.hole_diameter
     const padHeight = plated_hole.rect_pad_height || plated_hole.hole_diameter
     const rectBorderRadius = extractRectBorderRadius(plated_hole)
 
-    return colorize(
-      colors.copper,
-      subtract(
-        union(
-          // Top rectangular pad
-          createRectPadGeom({
-            width: padWidth,
-            height: padHeight,
-            thickness: platedHoleLipHeight,
-            center: [plated_hole.x, plated_hole.y, 1.2 / 2],
-            borderRadius: rectBorderRadius,
-          }),
-          // Bottom rectangular pad
-          createRectPadGeom({
-            width: padWidth,
-            height: padHeight,
-            thickness: platedHoleLipHeight,
-            center: [plated_hole.x, plated_hole.y, -1.2 / 2],
-            borderRadius: rectBorderRadius,
-          }),
-          // Plated barrel around hole
-          cylinder({
-            center: [plated_hole.x, plated_hole.y, 0],
-            radius: plated_hole.hole_diameter / 2,
-            height: 1.2,
-          }),
-        ),
-        // Subtract actual hole through
+    const copperSolid = maybeClip(
+      union(
+        // Top rectangular pad
+        createRectPadGeom({
+          width: padWidth,
+          height: padHeight,
+          thickness: platedHoleLipHeight,
+          center: [plated_hole.x, plated_hole.y, 1.2 / 2],
+          borderRadius: rectBorderRadius,
+        }),
+        // Bottom rectangular pad
+        createRectPadGeom({
+          width: padWidth,
+          height: padHeight,
+          thickness: platedHoleLipHeight,
+          center: [plated_hole.x, plated_hole.y, -1.2 / 2],
+          borderRadius: rectBorderRadius,
+        }),
+        // Plated barrel around hole
         cylinder({
           center: [plated_hole.x, plated_hole.y, 0],
-          radius: Math.max(plated_hole.hole_diameter / 2 - M, 0.01),
-          height: 1.5,
+          radius: plated_hole.hole_diameter / 2,
+          height: 1.2,
         }),
       ),
+      clipGeom,
     )
+
+    const drill = maybeClip(
+      cylinder({
+        center: [plated_hole.x, plated_hole.y, 0],
+        radius: Math.max(plated_hole.hole_diameter / 2 - M, 0.01),
+        height: 1.5,
+      }),
+      clipGeom,
+    )
+
+    return colorize(colors.copper, subtract(copperSolid, drill))
   }
 
   if (plated_hole.shape === "pill") {
@@ -247,10 +264,13 @@ export const platedHole = (
     })
     const drillUnion = union(drillRect, drillLeftCap, drillRightCap)
 
-    return colorize(
-      colors.copper,
-      subtract(union(barrelUnion, topLipUnion, bottomLipUnion), drillUnion),
+    const copperSolid = maybeClip(
+      union(barrelUnion, topLipUnion, bottomLipUnion),
+      clipGeom,
     )
+    const drill = maybeClip(drillUnion, clipGeom)
+
+    return colorize(colors.copper, subtract(copperSolid, drill))
     // biome-ignore lint/style/noUselessElse: <explanation>
   }
   if (plated_hole.shape === "pill_hole_with_rect_pad") {
@@ -330,10 +350,13 @@ export const platedHole = (
       }),
     )
 
-    return colorize(
-      colors.copper,
-      subtract(union(mainRect, leftCap, rightCap, topPad, bottomPad), holeCut),
+    const copperSolid = maybeClip(
+      union(mainRect, leftCap, rightCap, topPad, bottomPad),
+      clipGeom,
     )
+    const drill = maybeClip(holeCut, clipGeom)
+
+    return colorize(colors.copper, subtract(copperSolid, drill))
   } else {
     throw new Error(`Unsupported plated hole shape: ${plated_hole.shape}`)
   }

@@ -441,13 +441,9 @@ export class BoardGeomBuilder {
         colorize(colors.copper, subtract(pg, cyGeom)),
       )
 
-      let platedHoleGeom = platedHole(ph, this.ctx)
-      if (this.boardClipGeom) {
-        platedHoleGeom = colorize(
-          colors.copper,
-          intersect(this.boardClipGeom, platedHoleGeom),
-        )
-      }
+      const platedHoleGeom = platedHole(ph, this.ctx, {
+        clipGeom: this.boardClipGeom,
+      })
       this.platedHoleGeoms.push(platedHoleGeom)
     } else if (ph.shape === "pill" || ph.shape === "pill_hole_with_rect_pad") {
       const shouldRotate = ph.hole_height! > ph.hole_width!
@@ -487,13 +483,9 @@ export class BoardGeomBuilder {
         colorize(colors.copper, subtract(pg, pillHole)),
       )
 
-      let platedHoleGeom = platedHole(ph, this.ctx)
-      if (this.boardClipGeom) {
-        platedHoleGeom = colorize(
-          colors.copper,
-          intersect(this.boardClipGeom, platedHoleGeom),
-        )
-      }
+      const platedHoleGeom = platedHole(ph, this.ctx, {
+        clipGeom: this.boardClipGeom,
+      })
       this.platedHoleGeoms.push(platedHoleGeom)
     }
   }
