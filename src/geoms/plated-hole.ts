@@ -66,6 +66,7 @@ export const platedHole = (
 ): Geom3 => {
   const { clipGeom } = options
   if (!(plated_hole as PCBPlatedHole).shape) plated_hole.shape = "circle"
+  const throughDrillHeight = ctx.pcbThickness + 2 * platedHoleLipHeight + 4 * M
   if (plated_hole.shape === "circle") {
     const barrel = cylinder({
       center: [plated_hole.x, plated_hole.y, 0],
@@ -96,7 +97,7 @@ export const platedHole = (
     const drill = cylinder({
       center: [plated_hole.x, plated_hole.y, 0],
       radius: plated_hole.hole_diameter / 2 - M,
-      height: 1.5,
+      height: throughDrillHeight,
     })
 
     return colorize(colors.copper, subtract(copperSolid, drill))
@@ -137,7 +138,7 @@ export const platedHole = (
     const drill = cylinder({
       center: [plated_hole.x, plated_hole.y, 0],
       radius: Math.max(plated_hole.hole_diameter / 2 - M, 0.01),
-      height: 1.5,
+      height: throughDrillHeight,
     })
 
     return colorize(colors.copper, subtract(copperSolid, drill))
@@ -239,22 +240,22 @@ export const platedHole = (
     const drillRect = cuboid({
       center: [plated_hole.x, plated_hole.y, 0],
       size: shouldRotate
-        ? [holeHeight - 2 * M, rectLength, ctx.pcbThickness + 2 * M]
-        : [rectLength, holeHeight - 2 * M, ctx.pcbThickness + 2 * M],
+        ? [holeHeight - 2 * M, rectLength, throughDrillHeight]
+        : [rectLength, holeHeight - 2 * M, throughDrillHeight],
     })
     const drillLeftCap = cylinder({
       center: shouldRotate
         ? [plated_hole.x, plated_hole.y - rectLength / 2, 0]
         : [plated_hole.x - rectLength / 2, plated_hole.y, 0],
       radius: holeRadius - M,
-      height: ctx.pcbThickness + 2 * M,
+      height: throughDrillHeight,
     })
     const drillRightCap = cylinder({
       center: shouldRotate
         ? [plated_hole.x, plated_hole.y + rectLength / 2, 0]
         : [plated_hole.x + rectLength / 2, plated_hole.y, 0],
       radius: holeRadius - M,
-      height: ctx.pcbThickness + 2 * M,
+      height: throughDrillHeight,
     })
     const drillUnion = union(drillRect, drillLeftCap, drillRightCap)
 
@@ -325,22 +326,22 @@ export const platedHole = (
       cuboid({
         center: [plated_hole.x, plated_hole.y, 0],
         size: shouldRotate
-          ? [holeHeight - platedHoleLipHeight, rectLength, 1.5]
-          : [rectLength, holeHeight - platedHoleLipHeight, 1.5],
+          ? [holeHeight - platedHoleLipHeight, rectLength, throughDrillHeight]
+          : [rectLength, holeHeight - platedHoleLipHeight, throughDrillHeight],
       }),
       cylinder({
         center: shouldRotate
           ? [plated_hole.x, plated_hole.y - rectLength / 2, 0]
           : [plated_hole.x - rectLength / 2, plated_hole.y, 0],
         radius: holeRadius - platedHoleLipHeight,
-        height: 1.5,
+        height: throughDrillHeight,
       }),
       cylinder({
         center: shouldRotate
           ? [plated_hole.x, plated_hole.y + rectLength / 2, 0]
           : [plated_hole.x + rectLength / 2, plated_hole.y, 0],
         radius: holeRadius - platedHoleLipHeight,
-        height: 1.5,
+        height: throughDrillHeight,
       }),
     )
 
