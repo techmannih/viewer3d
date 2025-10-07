@@ -139,13 +139,45 @@ export const useManifoldBoardBuilder = (
       const currentPcbThickness = boardData.thickness || 1.6
       setPcbThickness(currentPcbThickness)
 
-      let currentBoardOp = createManifoldBoard(
-        Manifold,
-        CrossSection,
-        boardData,
-        currentPcbThickness,
-        manifoldInstancesForCleanup.current,
-      )
+      const { boardOp: initialBoardOp, outlineCrossSection } =
+        createManifoldBoard(
+          Manifold,
+          CrossSection,
+          boardData,
+          currentPcbThickness,
+          manifoldInstancesForCleanup.current,
+        )
+      let currentBoardOp = initialBoardOp
+
+      const BOARD_CLIP_Z_MARGIN = 1
+      const clipThickness = currentPcbThickness + 2 * BOARD_CLIP_Z_MARGIN
+      let boardClipVolume: any | null = null
+
+      if (outlineCrossSection) {
+        const clipOp = Manifold.extrude(
+          outlineCrossSection,
+          clipThickness,
+          undefined,
+          undefined,
+          undefined,
+          true,
+        )
+        manifoldInstancesForCleanup.current.push(clipOp)
+        boardClipVolume = clipOp
+      } else {
+        const clipCube = Manifold.cube(
+          [boardData.width || 0, boardData.height || 0, clipThickness],
+          true,
+        )
+        manifoldInstancesForCleanup.current.push(clipCube)
+        const translatedClipCube = clipCube.translate([
+          boardData.center.x,
+          boardData.center.y,
+          0,
+        ])
+        manifoldInstancesForCleanup.current.push(translatedClipCube)
+        boardClipVolume = translatedClipCube
+      }
 
       // --- Batch Process All Holes (non-plated, plated, vias) ---
       const allBoardDrills: any[] = []
@@ -167,6 +199,7 @@ export const useManifoldBoardBuilder = (
           circuitJson,
           currentPcbThickness,
           manifoldInstancesForCleanup.current,
+          boardClipVolume,
         )
       allBoardDrills.push(...platedHoleBoardDrills)
       currentGeoms.platedHoles = platedHoleCopperGeoms
@@ -177,6 +210,7 @@ export const useManifoldBoardBuilder = (
         circuitJson,
         currentPcbThickness,
         manifoldInstancesForCleanup.current,
+        boardClipVolume,
       )
       allBoardDrills.push(...viaBoardDrills)
       currentGeoms.vias = viaCopperGeoms
@@ -231,6 +265,7 @@ export const useManifoldBoardBuilder = (
         currentPcbThickness,
         manifoldInstancesForCleanup.current,
         holeUnion,
+        boardClipVolume,
       )
       currentGeoms.smtPads = smtPadGeoms
 
@@ -242,6 +277,7 @@ export const useManifoldBoardBuilder = (
         currentPcbThickness,
         manifoldInstancesForCleanup.current,
         holeUnion,
+        boardClipVolume,
       )
       currentGeoms.copperPours = copperPourGeoms
 
