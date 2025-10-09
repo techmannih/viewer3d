@@ -16,7 +16,7 @@ import {
   extractRectBorderRadius,
 } from "../utils/rect-border-radius"
 
-const platedHoleLipHeight = 0.05
+export const PLATED_HOLE_LIP_HEIGHT = 0.05
 const RECT_PAD_SEGMENTS = 64
 
 const createRectPadGeom = ({
@@ -67,19 +67,19 @@ export const platedHole = (
             center: [
               plated_hole.x,
               plated_hole.y,
-              ctx.pcbThickness / 2 + platedHoleLipHeight / 2 + M,
+              ctx.pcbThickness / 2 + PLATED_HOLE_LIP_HEIGHT / 2 + M,
             ],
             radius: plated_hole.outer_diameter / 2,
-            height: platedHoleLipHeight,
+            height: PLATED_HOLE_LIP_HEIGHT,
           }),
           cylinder({
             center: [
               plated_hole.x,
               plated_hole.y,
-              -ctx.pcbThickness / 2 - platedHoleLipHeight / 2 - M,
+              -ctx.pcbThickness / 2 - PLATED_HOLE_LIP_HEIGHT / 2 - M,
             ],
             radius: plated_hole.outer_diameter / 2,
-            height: platedHoleLipHeight,
+            height: PLATED_HOLE_LIP_HEIGHT,
           }),
         ),
         cylinder({
@@ -103,7 +103,7 @@ export const platedHole = (
           createRectPadGeom({
             width: padWidth,
             height: padHeight,
-            thickness: platedHoleLipHeight,
+            thickness: PLATED_HOLE_LIP_HEIGHT,
             center: [plated_hole.x, plated_hole.y, 1.2 / 2],
             borderRadius: rectBorderRadius,
           }),
@@ -111,7 +111,7 @@ export const platedHole = (
           createRectPadGeom({
             width: padWidth,
             height: padHeight,
-            thickness: platedHoleLipHeight,
+            thickness: PLATED_HOLE_LIP_HEIGHT,
             center: [plated_hole.x, plated_hole.y, -1.2 / 2],
             borderRadius: rectBorderRadius,
           }),
@@ -175,49 +175,49 @@ export const platedHole = (
     })
     const barrelUnion = union(mainRectBarrel, leftCapBarrel, rightCapBarrel)
 
-    const topLipZ = ctx.pcbThickness / 2 + platedHoleLipHeight / 2 + M
+    const topLipZ = ctx.pcbThickness / 2 + PLATED_HOLE_LIP_HEIGHT / 2 + M
     const topLipRect = cuboid({
       center: [plated_hole.x, plated_hole.y, topLipZ],
       size: shouldRotate
-        ? [outerPillHeight, outerRectLength, platedHoleLipHeight]
-        : [outerRectLength, outerPillHeight, platedHoleLipHeight],
+        ? [outerPillHeight, outerRectLength, PLATED_HOLE_LIP_HEIGHT]
+        : [outerRectLength, outerPillHeight, PLATED_HOLE_LIP_HEIGHT],
     })
     const topLipLeftCap = cylinder({
       center: shouldRotate
         ? [plated_hole.x, plated_hole.y - outerRectLength / 2, topLipZ]
         : [plated_hole.x - outerRectLength / 2, plated_hole.y, topLipZ],
       radius: outerRadius,
-      height: platedHoleLipHeight,
+      height: PLATED_HOLE_LIP_HEIGHT,
     })
     const topLipRightCap = cylinder({
       center: shouldRotate
         ? [plated_hole.x, plated_hole.y + outerRectLength / 2, topLipZ]
         : [plated_hole.x + outerRectLength / 2, plated_hole.y, topLipZ],
       radius: outerRadius,
-      height: platedHoleLipHeight,
+      height: PLATED_HOLE_LIP_HEIGHT,
     })
     const topLipUnion = union(topLipRect, topLipLeftCap, topLipRightCap)
 
-    const bottomLipZ = -ctx.pcbThickness / 2 - platedHoleLipHeight / 2 - M
+    const bottomLipZ = -ctx.pcbThickness / 2 - PLATED_HOLE_LIP_HEIGHT / 2 - M
     const bottomLipRect = cuboid({
       center: [plated_hole.x, plated_hole.y, bottomLipZ],
       size: shouldRotate
-        ? [outerPillHeight, outerRectLength, platedHoleLipHeight]
-        : [outerRectLength, outerPillHeight, platedHoleLipHeight],
+        ? [outerPillHeight, outerRectLength, PLATED_HOLE_LIP_HEIGHT]
+        : [outerRectLength, outerPillHeight, PLATED_HOLE_LIP_HEIGHT],
     })
     const bottomLipLeftCap = cylinder({
       center: shouldRotate
         ? [plated_hole.x, plated_hole.y - outerRectLength / 2, bottomLipZ]
         : [plated_hole.x - outerRectLength / 2, plated_hole.y, bottomLipZ],
       radius: outerRadius,
-      height: platedHoleLipHeight,
+      height: PLATED_HOLE_LIP_HEIGHT,
     })
     const bottomLipRightCap = cylinder({
       center: shouldRotate
         ? [plated_hole.x, plated_hole.y + outerRectLength / 2, bottomLipZ]
         : [plated_hole.x + outerRectLength / 2, plated_hole.y, bottomLipZ],
       radius: outerRadius,
-      height: platedHoleLipHeight,
+      height: PLATED_HOLE_LIP_HEIGHT,
     })
     const bottomLipUnion = union(
       bottomLipRect,
@@ -294,7 +294,7 @@ export const platedHole = (
     const topPad = createRectPadGeom({
       width: padWidth,
       height: padHeight,
-      thickness: platedHoleLipHeight,
+      thickness: PLATED_HOLE_LIP_HEIGHT,
       center: [plated_hole.x, plated_hole.y, 1.2 / 2],
       borderRadius: rectBorderRadius,
     })
@@ -302,7 +302,7 @@ export const platedHole = (
     const bottomPad = createRectPadGeom({
       width: padWidth,
       height: padHeight,
-      thickness: platedHoleLipHeight,
+      thickness: PLATED_HOLE_LIP_HEIGHT,
       center: [plated_hole.x, plated_hole.y, -1.2 / 2],
       borderRadius: rectBorderRadius,
     })
@@ -311,21 +311,21 @@ export const platedHole = (
       cuboid({
         center: [plated_hole.x, plated_hole.y, 0],
         size: shouldRotate
-          ? [holeHeight - platedHoleLipHeight, rectLength, 1.5]
-          : [rectLength, holeHeight - platedHoleLipHeight, 1.5],
+          ? [holeHeight - PLATED_HOLE_LIP_HEIGHT, rectLength, 1.5]
+          : [rectLength, holeHeight - PLATED_HOLE_LIP_HEIGHT, 1.5],
       }),
       cylinder({
         center: shouldRotate
           ? [plated_hole.x, plated_hole.y - rectLength / 2, 0]
           : [plated_hole.x - rectLength / 2, plated_hole.y, 0],
-        radius: holeRadius - platedHoleLipHeight,
+        radius: holeRadius - PLATED_HOLE_LIP_HEIGHT,
         height: 1.5,
       }),
       cylinder({
         center: shouldRotate
           ? [plated_hole.x, plated_hole.y + rectLength / 2, 0]
           : [plated_hole.x + rectLength / 2, plated_hole.y, 0],
-        radius: holeRadius - platedHoleLipHeight,
+        radius: holeRadius - PLATED_HOLE_LIP_HEIGHT,
         height: 1.5,
       }),
     )

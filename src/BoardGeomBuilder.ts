@@ -23,8 +23,8 @@ import {
   roundedRectangle,
 } from "@jscad/modeling/src/primitives"
 import { colorize } from "@jscad/modeling/src/colors"
-import { subtract, union } from "@jscad/modeling/src/operations/booleans"
-import { platedHole } from "./geoms/plated-hole"
+import { subtract, union, intersect } from "@jscad/modeling/src/operations/booleans"
+import { platedHole, PLATED_HOLE_LIP_HEIGHT } from "./geoms/plated-hole"
 import {
   M,
   colors,
@@ -115,6 +115,7 @@ export class BoardGeomBuilder {
   private pcb_copper_pours: PcbCopperPour[]
 
   private boardGeom: Geom3 | null = null
+  private boardClipGeom: Geom3 | null = null
   private platedHoleGeoms: Geom3[] = []
   private holeGeoms: Geom3[] = [] // Currently only used for subtraction
   private padGeoms: Geom3[] = []
@@ -182,21 +183,39 @@ export class BoardGeomBuilder {
   }
 
   private initializeBoard() {
+    const boardThickness = this.ctx.pcbThickness
+    const boardClipDepth =
+      boardThickness + 2 * (PLATED_HOLE_LIP_HEIGHT + M)
+    const boardCenterX = this.board.center?.x ?? 0
+    const boardCenterY = this.board.center?.y ?? 0
+
     if (this.board.outline && this.board.outline.length > 0) {
+      const boardOutline = { outline: this.board.outline! }
       this.boardGeom = createBoardGeomWithOutline(
-        {
-          outline: this.board.outline!,
-        },
-        this.ctx.pcbThickness,
+        boardOutline,
+        boardThickness,
+      )
+      this.boardClipGeom = createBoardGeomWithOutline(
+        boardOutline,
+        boardClipDepth,
       )
     } else {
       this.boardGeom = cuboid({
-        size: [this.board.width, this.board.height, this.ctx.pcbThickness],
-        center: [this.board.center.x, this.board.center.y, 0],
+        size: [this.board.width, this.board.height, boardThickness],
+        center: [boardCenterX, boardCenterY, 0],
+      })
+      this.boardClipGeom = cuboid({
+        size: [this.board.width, this.board.height, boardClipDepth],
+        center: [boardCenterX, boardCenterY, 0],
       })
     }
     this.state = "processing_pads"
     this.currentIndex = 0
+  }
+
+  private clipCopperToBoard(geom: Geom3): Geom3 {
+    if (!this.boardClipGeom) return geom
+    return colorize(colors.copper, intersect(this.boardClipGeom, geom))
   }
 
   goToNextState() {
@@ -421,7 +440,7 @@ export class BoardGeomBuilder {
       )
 
       const platedHoleGeom = platedHole(ph, this.ctx)
-      this.platedHoleGeoms.push(platedHoleGeom)
+      this.platedHoleGeoms.push(this.clipCopperToBoard(platedHoleGeom))
     } else if (ph.shape === "pill" || ph.shape === "pill_hole_with_rect_pad") {
       const shouldRotate = ph.hole_height! > ph.hole_width!
       const holeWidth = shouldRotate ? ph.hole_height! : ph.hole_width!
@@ -461,7 +480,7 @@ export class BoardGeomBuilder {
       )
 
       const platedHoleGeom = platedHole(ph, this.ctx)
-      this.platedHoleGeoms.push(platedHoleGeom)
+      this.platedHoleGeoms.push(this.clipCopperToBoard(platedHoleGeom))
     }
   }
 
