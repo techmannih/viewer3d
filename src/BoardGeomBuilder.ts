@@ -12,6 +12,9 @@ import type {
   Point,
   PcbCutout,
   PcbCopperPour,
+  PcbFabricationNoteText,
+  PcbFabricationNotePath,
+  PcbComponent,
 } from "circuit-json"
 import { su } from "@tscircuit/circuit-json-util"
 import { translate, rotateZ } from "@jscad/modeling/src/operations/transforms"
@@ -23,6 +26,7 @@ import {
   roundedRectangle,
 } from "@jscad/modeling/src/primitives"
 import { colorize } from "@jscad/modeling/src/colors"
+import type { RGB } from "@jscad/modeling/src/colors"
 import {
   subtract,
   union,
@@ -42,8 +46,13 @@ import {
   arePointsClockwise,
 } from "./geoms/create-board-with-outline"
 import type { Vec2 } from "@jscad/modeling/src/maths/types"
-import { createSilkscreenTextGeoms } from "./geoms/create-geoms-for-silkscreen-text"
-import { createSilkscreenPathGeom } from "./geoms/create-geoms-for-silkscreen-path"
+import {
+  createSilkscreenTextGeoms,
+  PcbTextElementForGeoms,
+} from "./geoms/create-geoms-for-silkscreen-text"
+import {
+  createSilkscreenPathGeom,
+} from "./geoms/create-geoms-for-silkscreen-path"
 import { createGeom2FromBRep } from "./geoms/brep-converter"
 import type { GeomContext } from "./GeomContext"
 import {
@@ -85,6 +94,8 @@ type BuilderState =
   | "processing_vias"
   | "processing_silkscreen_text"
   | "processing_silkscreen_paths"
+  | "processing_fabrication_note_texts"
+  | "processing_fabrication_note_paths"
   | "processing_cutouts"
   | "processing_copper_pours"
   | "finalizing"
@@ -103,6 +114,8 @@ const buildStateOrder: BuilderState[] = [
   "processing_vias",
   "processing_silkscreen_text",
   "processing_silkscreen_paths",
+  "processing_fabrication_note_texts",
+  "processing_fabrication_note_paths",
   "finalizing",
   "done",
 ]
@@ -119,6 +132,9 @@ export class BoardGeomBuilder {
   private silkscreenPaths: PcbSilkscreenPath[]
   private pcb_cutouts: PcbCutout[]
   private pcb_copper_pours: PcbCopperPour[]
+  private fabricationNoteTexts: PcbFabricationNoteText[]
+  private fabricationNotePaths: PcbFabricationNotePath[]
+  private pcbComponentById: Map<string, PcbComponent>
 
   private boardGeom: Geom3 | null = null
   private platedHoleGeoms: Geom3[] = []
@@ -129,6 +145,8 @@ export class BoardGeomBuilder {
   private silkscreenTextGeoms: Geom3[] = []
   private silkscreenPathGeoms: Geom3[] = []
   private copperPourGeoms: Geom3[] = []
+  private fabricationNoteTextGeoms: Geom3[] = []
+  private fabricationNotePathGeoms: Geom3[] = []
   private boardClipGeom: Geom3 | null = null
 
   private state: BuilderState = "initializing"
@@ -136,6 +154,93 @@ export class BoardGeomBuilder {
   private ctx: GeomContext
   private onCompleteCallback?: (geoms: Geom3[]) => void
   private finalGeoms: Geom3[] = []
+
+  private parseNumber(value: unknown, fallback: number): number {
+    if (typeof value === "number" && !Number.isNaN(value)) {
+      return value
+    }
+
+    if (typeof value === "string") {
+      const parsed = parseFloat(value)
+      if (!Number.isNaN(parsed)) return parsed
+    }
+
+    return fallback
+  }
+
+  private normalizeLayer(layer: unknown): "top" | "bottom" {
+    return layer === "bottom" ? "bottom" : "top"
+  }
+
+  private createTextGeomsFromSource(
+    source:
+      | PcbSilkscreenText
+      | PcbFabricationNoteText
+      | (PcbSilkscreenText & PcbFabricationNoteText),
+    options: {
+      color: RGB
+      zOffsetMultiplier?: number
+      height?: number
+      defaultFontSize?: number
+    },
+  ): Geom3[] {
+    if (!source.text) return []
+
+    const fontSize = this.parseNumber(
+      source.font_size,
+      options.defaultFontSize ?? 0.25,
+    )
+    const anchorPosition = this.resolveAnchorPosition(
+      source.anchor_position ?? null,
+      source.pcb_component_id,
+    )
+    const layer = this.normalizeLayer(source.layer)
+    const rotationRaw = (source as any).ccw_rotation ?? (source as any).rotation
+    const ccwRotation = this.parseNumber(rotationRaw, 0)
+
+    const textElement: PcbTextElementForGeoms = {
+      text: source.text,
+      font_size: fontSize,
+      anchor_position: anchorPosition,
+      anchor_alignment: source.anchor_alignment ?? "center",
+      layer,
+      ccw_rotation: ccwRotation,
+    }
+
+    const { textOutlines, xOffset, yOffset } =
+      createSilkscreenTextGeoms(textElement)
+
+    const layerSign = layer === "bottom" ? -1 : 1
+    const zOffsetMultiplier = options.zOffsetMultiplier ?? 1
+    const textHeight = options.height ?? 0.012
+
+    const expansionDelta = Math.max(
+      0.01,
+      Math.min(fontSize * 0.1, fontSize * 0.05),
+    )
+
+    return textOutlines.map((outline) => {
+      const alignedOutline = outline.map((point) => [
+        point[0] + xOffset + anchorPosition.x,
+        point[1] + yOffset + anchorPosition.y,
+      ]) as Vec2[]
+
+      const textPath = line(alignedOutline)
+      const expandedPath = expand(
+        { delta: expansionDelta, corners: "round" },
+        textPath,
+      )
+      const zPos =
+        (layerSign * this.ctx.pcbThickness) / 2 + layerSign * M * zOffsetMultiplier
+
+      const textGeom = translate(
+        [0, 0, zPos],
+        extrudeLinear({ height: textHeight }, expandedPath),
+      )
+
+      return colorize(options.color, textGeom)
+    })
+  }
 
   private getHoleToCut(x: number, y: number): { diameter: number } | null {
     const epsilon = M / 10
@@ -181,11 +286,42 @@ export class BoardGeomBuilder {
     this.pcb_copper_pours = circuitJson.filter(
       (e) => e.type === "pcb_copper_pour",
     ) as any
+    this.fabricationNoteTexts = su(circuitJson).pcb_fabrication_note_text.list()
+    this.fabricationNotePaths = su(circuitJson).pcb_fabrication_note_path.list()
+    const pcbComponents = su(circuitJson).pcb_component.list()
+    this.pcbComponentById = new Map(
+      pcbComponents.map((component) => [
+        component.pcb_component_id,
+        component,
+      ]),
+    )
 
     this.ctx = { pcbThickness: this.board.thickness ?? 1.2 }
 
     // Start processing
     this.initializeBoard()
+  }
+
+  private resolveAnchorPosition(
+    anchorPosition: Point | undefined | null,
+    pcbComponentId?: string,
+  ): Point {
+    if (anchorPosition) {
+      return { x: anchorPosition.x, y: anchorPosition.y }
+    }
+
+    if (pcbComponentId) {
+      const component = this.pcbComponentById.get(pcbComponentId)
+      if (component?.center) {
+        return { x: component.center.x, y: component.center.y }
+      }
+    }
+
+    if (this.board?.center) {
+      return { x: this.board.center.x, y: this.board.center.y }
+    }
+
+    return { x: 0, y: 0 }
   }
 
   private initializeBoard() {
@@ -296,6 +432,28 @@ export class BoardGeomBuilder {
         case "processing_silkscreen_paths":
           if (this.currentIndex < this.silkscreenPaths.length) {
             this.processSilkscreenPath(this.silkscreenPaths[this.currentIndex]!)
+            this.currentIndex++
+          } else {
+            this.goToNextState()
+          }
+          break
+
+        case "processing_fabrication_note_texts":
+          if (this.currentIndex < this.fabricationNoteTexts.length) {
+            this.processFabricationNoteText(
+              this.fabricationNoteTexts[this.currentIndex]!,
+            )
+            this.currentIndex++
+          } else {
+            this.goToNextState()
+          }
+          break
+
+        case "processing_fabrication_note_paths":
+          if (this.currentIndex < this.fabricationNotePaths.length) {
+            this.processFabricationNotePath(
+              this.fabricationNotePaths[this.currentIndex]!,
+            )
             this.currentIndex++
           } else {
             this.goToNextState()
@@ -702,45 +860,57 @@ export class BoardGeomBuilder {
   }
 
   private processSilkscreenText(st: PcbSilkscreenText) {
-    const { textOutlines, xOffset, yOffset } = createSilkscreenTextGeoms(st)
+    const textGeoms = this.createTextGeomsFromSource(st, {
+      color: [1, 1, 1],
+      zOffsetMultiplier: 1,
+    })
 
-    for (const outline of textOutlines) {
-      const alignedOutline = outline.map((point) => [
-        point[0] + xOffset + st.anchor_position.x,
-        point[1] + yOffset + st.anchor_position.y,
-      ]) as Vec2[]
-      const textPath = line(alignedOutline)
-
-      const fontSize = st.font_size || 0.25
-      const expansionDelta = Math.min(
-        Math.max(0.01, fontSize * 0.1),
-        fontSize * 0.05,
-      )
-      const expandedPath = expand(
-        { delta: expansionDelta, corners: "round" },
-        textPath,
-      )
-      let textGeom: any
-      if (st.layer === "bottom") {
-        textGeom = translate(
-          [0, 0, -this.ctx.pcbThickness / 2 - M], // Position above board
-          extrudeLinear({ height: 0.012 }, expandedPath),
-        )
-      } else {
-        textGeom = translate(
-          [0, 0, this.ctx.pcbThickness / 2 + M], // Position above board
-          extrudeLinear({ height: 0.012 }, expandedPath),
-        )
-      }
-      textGeom = colorize([1, 1, 1], textGeom) // White
-      this.silkscreenTextGeoms.push(textGeom)
-    }
+    this.silkscreenTextGeoms.push(...textGeoms)
   }
 
   private processSilkscreenPath(sp: PcbSilkscreenPath) {
-    const pathGeom = createSilkscreenPathGeom(sp, this.ctx)
+    if (!sp.route || sp.route.length < 2) return
+
+    const pathGeom = createSilkscreenPathGeom(
+      {
+        route: sp.route,
+        stroke_width: this.parseNumber(sp.stroke_width, 0.1),
+        layer: this.normalizeLayer(sp.layer),
+      },
+      this.ctx,
+    )
     if (pathGeom) {
       this.silkscreenPathGeoms.push(pathGeom)
+    }
+  }
+
+  private processFabricationNoteText(note: PcbFabricationNoteText) {
+    const textGeoms = this.createTextGeomsFromSource(note, {
+      color: colors.fabricationNote,
+      zOffsetMultiplier: 2.5,
+    })
+
+    this.fabricationNoteTextGeoms.push(...textGeoms)
+  }
+
+  private processFabricationNotePath(note: PcbFabricationNotePath) {
+    if (!note.route || note.route.length < 2) return
+
+    const pathGeom = createSilkscreenPathGeom(
+      {
+        route: note.route,
+        stroke_width: this.parseNumber(note.stroke_width, 0.15),
+        layer: this.normalizeLayer(note.layer),
+      },
+      this.ctx,
+      {
+        color: colors.fabricationNote,
+        zOffsetMultiplier: 2.5,
+      },
+    )
+
+    if (pathGeom) {
+      this.fabricationNotePathGeoms.push(pathGeom)
     }
   }
 
@@ -760,6 +930,8 @@ export class BoardGeomBuilder {
       ...this.copperPourGeoms,
       ...this.silkscreenTextGeoms,
       ...this.silkscreenPathGeoms,
+      ...this.fabricationNoteTextGeoms,
+      ...this.fabricationNotePathGeoms,
     ]
 
     if (this.onCompleteCallback) {
