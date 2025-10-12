@@ -26,6 +26,7 @@ import { manifoldMeshToThreeGeometry } from "../utils/manifold-mesh-to-three-geo
 import type { ManifoldToplevel } from "manifold-3d/manifold.d.ts"
 import { createTraceTextureForLayer } from "../utils/trace-texture"
 import { createSilkscreenTextureForLayer } from "../utils/silkscreen-texture"
+import { createFabricationNoteTextureForLayer } from "../utils/fabrication-note-texture"
 import { processNonPlatedHolesForManifold } from "../utils/manifold/process-non-plated-holes"
 import { processPlatedHolesForManifold } from "../utils/manifold/process-plated-holes"
 import { processViasForManifold } from "../utils/manifold/process-vias"
@@ -67,6 +68,8 @@ export interface ManifoldTextures {
   bottomTrace?: THREE.CanvasTexture | null
   topSilkscreen?: THREE.CanvasTexture | null
   bottomSilkscreen?: THREE.CanvasTexture | null
+  topFabricationNotes?: THREE.CanvasTexture | null
+  bottomFabricationNotes?: THREE.CanvasTexture | null
 }
 
 interface UseManifoldBoardBuilderResult {
@@ -331,6 +334,21 @@ export const useManifoldBoardBuilder = (
         silkscreenColor,
         traceTextureResolution: TRACE_TEXTURE_RESOLUTION,
       })
+
+      currentTextures.topFabricationNotes =
+        createFabricationNoteTextureForLayer({
+          layer: "top",
+          circuitJson,
+          boardData,
+          traceTextureResolution: TRACE_TEXTURE_RESOLUTION,
+        })
+      currentTextures.bottomFabricationNotes =
+        createFabricationNoteTextureForLayer({
+          layer: "bottom",
+          circuitJson,
+          boardData,
+          traceTextureResolution: TRACE_TEXTURE_RESOLUTION,
+        })
       setTextures(currentTextures)
     } catch (e: any) {
       console.error("Error processing geometry with Manifold in hook:", e)
