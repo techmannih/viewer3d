@@ -26,6 +26,7 @@ import {
   roundedRectangle,
 } from "@jscad/modeling/src/primitives"
 import { colorize } from "@jscad/modeling/src/colors"
+import type { RGB } from "@jscad/modeling/src/colors"
 import {
   subtract,
   union,
@@ -51,7 +52,6 @@ import {
 } from "./geoms/create-geoms-for-silkscreen-text"
 import {
   createSilkscreenPathGeom,
-  PcbPathElementForGeoms,
 } from "./geoms/create-geoms-for-silkscreen-path"
 import { createGeom2FromBRep } from "./geoms/brep-converter"
 import type { GeomContext } from "./GeomContext"
@@ -154,6 +154,93 @@ export class BoardGeomBuilder {
   private ctx: GeomContext
   private onCompleteCallback?: (geoms: Geom3[]) => void
   private finalGeoms: Geom3[] = []
+
+  private parseNumber(value: unknown, fallback: number): number {
+    if (typeof value === "number" && !Number.isNaN(value)) {
+      return value
+    }
+
+    if (typeof value === "string") {
+      const parsed = parseFloat(value)
+      if (!Number.isNaN(parsed)) return parsed
+    }
+
+    return fallback
+  }
+
+  private normalizeLayer(layer: unknown): "top" | "bottom" {
+    return layer === "bottom" ? "bottom" : "top"
+  }
+
+  private createTextGeomsFromSource(
+    source:
+      | PcbSilkscreenText
+      | PcbFabricationNoteText
+      | (PcbSilkscreenText & PcbFabricationNoteText),
+    options: {
+      color: RGB
+      zOffsetMultiplier?: number
+      height?: number
+      defaultFontSize?: number
+    },
+  ): Geom3[] {
+    if (!source.text) return []
+
+    const fontSize = this.parseNumber(
+      source.font_size,
+      options.defaultFontSize ?? 0.25,
+    )
+    const anchorPosition = this.resolveAnchorPosition(
+      source.anchor_position ?? null,
+      source.pcb_component_id,
+    )
+    const layer = this.normalizeLayer(source.layer)
+    const rotationRaw = (source as any).ccw_rotation ?? (source as any).rotation
+    const ccwRotation = this.parseNumber(rotationRaw, 0)
+
+    const textElement: PcbTextElementForGeoms = {
+      text: source.text,
+      font_size: fontSize,
+      anchor_position: anchorPosition,
+      anchor_alignment: source.anchor_alignment ?? "center",
+      layer,
+      ccw_rotation: ccwRotation,
+    }
+
+    const { textOutlines, xOffset, yOffset } =
+      createSilkscreenTextGeoms(textElement)
+
+    const layerSign = layer === "bottom" ? -1 : 1
+    const zOffsetMultiplier = options.zOffsetMultiplier ?? 1
+    const textHeight = options.height ?? 0.012
+
+    const expansionDelta = Math.max(
+      0.01,
+      Math.min(fontSize * 0.1, fontSize * 0.05),
+    )
+
+    return textOutlines.map((outline) => {
+      const alignedOutline = outline.map((point) => [
+        point[0] + xOffset + anchorPosition.x,
+        point[1] + yOffset + anchorPosition.y,
+      ]) as Vec2[]
+
+      const textPath = line(alignedOutline)
+      const expandedPath = expand(
+        { delta: expansionDelta, corners: "round" },
+        textPath,
+      )
+      const zPos =
+        (layerSign * this.ctx.pcbThickness) / 2 + layerSign * M * zOffsetMultiplier
+
+      const textGeom = translate(
+        [0, 0, zPos],
+        extrudeLinear({ height: textHeight }, expandedPath),
+      )
+
+      return colorize(options.color, textGeom)
+    })
+  }
 
   private getHoleToCut(x: number, y: number): { diameter: number } | null {
     const epsilon = M / 10
@@ -773,133 +860,54 @@ export class BoardGeomBuilder {
   }
 
   private processSilkscreenText(st: PcbSilkscreenText) {
-    const { textOutlines, xOffset, yOffset } = createSilkscreenTextGeoms(st)
+    const textGeoms = this.createTextGeomsFromSource(st, {
+      color: [1, 1, 1],
+      zOffsetMultiplier: 1,
+    })
 
-    for (const outline of textOutlines) {
-      const alignedOutline = outline.map((point) => [
-        point[0] + xOffset + st.anchor_position.x,
-        point[1] + yOffset + st.anchor_position.y,
-      ]) as Vec2[]
-      const textPath = line(alignedOutline)
-
-      const fontSize = st.font_size || 0.25
-      const expansionDelta = Math.min(
-        Math.max(0.01, fontSize * 0.1),
-        fontSize * 0.05,
-      )
-      const expandedPath = expand(
-        { delta: expansionDelta, corners: "round" },
-        textPath,
-      )
-      let textGeom: any
-      if (st.layer === "bottom") {
-        textGeom = translate(
-          [0, 0, -this.ctx.pcbThickness / 2 - M], // Position above board
-          extrudeLinear({ height: 0.012 }, expandedPath),
-        )
-      } else {
-        textGeom = translate(
-          [0, 0, this.ctx.pcbThickness / 2 + M], // Position above board
-          extrudeLinear({ height: 0.012 }, expandedPath),
-        )
-      }
-      textGeom = colorize([1, 1, 1], textGeom) // White
-      this.silkscreenTextGeoms.push(textGeom)
-    }
+    this.silkscreenTextGeoms.push(...textGeoms)
   }
 
   private processSilkscreenPath(sp: PcbSilkscreenPath) {
-    const pathGeom = createSilkscreenPathGeom(sp, this.ctx)
+    if (!sp.route || sp.route.length < 2) return
+
+    const pathGeom = createSilkscreenPathGeom(
+      {
+        route: sp.route,
+        stroke_width: this.parseNumber(sp.stroke_width, 0.1),
+        layer: this.normalizeLayer(sp.layer),
+      },
+      this.ctx,
+    )
     if (pathGeom) {
       this.silkscreenPathGeoms.push(pathGeom)
     }
   }
 
   private processFabricationNoteText(note: PcbFabricationNoteText) {
-    const defaultFontSize = 0.25
-    const fontSizeRaw = note.font_size ?? defaultFontSize
-    const fontSize =
-      typeof fontSizeRaw === "number"
-        ? fontSizeRaw
-        : parseFloat(fontSizeRaw) || defaultFontSize
+    const textGeoms = this.createTextGeomsFromSource(note, {
+      color: colors.fabricationNote,
+      zOffsetMultiplier: 2.5,
+    })
 
-    const anchorPosition = this.resolveAnchorPosition(
-      note.anchor_position ?? null,
-      note.pcb_component_id,
-    )
-
-    const layer = note.layer === "bottom" ? "bottom" : "top"
-
-    const rotationRaw =
-      (note as any).ccw_rotation ?? (note as any).rotation ?? 0
-    const ccwRotation =
-      typeof rotationRaw === "number" ? rotationRaw : parseFloat(rotationRaw) || 0
-
-    const textElement: PcbTextElementForGeoms = {
-      text: note.text,
-      font_size: fontSize,
-      anchor_position: anchorPosition,
-      anchor_alignment: note.anchor_alignment ?? "center",
-      layer,
-      ccw_rotation: ccwRotation,
-    }
-
-    const { textOutlines, xOffset, yOffset } =
-      createSilkscreenTextGeoms(textElement)
-
-    for (const outline of textOutlines) {
-      const alignedOutline = outline.map((point) => [
-        point[0] + xOffset + anchorPosition.x,
-        point[1] + yOffset + anchorPosition.y,
-      ]) as Vec2[]
-
-      const textPath = line(alignedOutline)
-
-      const expansionDelta = Math.min(
-        Math.max(0.01, fontSize * 0.1),
-        fontSize * 0.05,
-      )
-
-      const expandedPath = expand(
-        { delta: expansionDelta, corners: "round" },
-        textPath,
-      )
-
-      const layerSign = textElement.layer === "bottom" ? -1 : 1
-      const zPos =
-        (layerSign * this.ctx.pcbThickness) / 2 + layerSign * M * 2.5
-
-      let textGeom = translate(
-        [0, 0, zPos],
-        extrudeLinear({ height: 0.012 }, expandedPath),
-      )
-
-      textGeom = colorize(colors.fabricationNote, textGeom)
-      this.fabricationNoteTextGeoms.push(textGeom)
-    }
+    this.fabricationNoteTextGeoms.push(...textGeoms)
   }
 
   private processFabricationNotePath(note: PcbFabricationNotePath) {
     if (!note.route || note.route.length < 2) return
 
-    const layer = note.layer === "bottom" ? "bottom" : "top"
-
-    const strokeWidthRaw = note.stroke_width ?? 0.15
-    const strokeWidth =
-      typeof strokeWidthRaw === "number"
-        ? strokeWidthRaw
-        : parseFloat(strokeWidthRaw) || 0.15
-
-    const pathElement: PcbPathElementForGeoms = {
-      route: note.route,
-      stroke_width: strokeWidth,
-      layer,
-    }
-
-    const pathGeom = createSilkscreenPathGeom(pathElement, this.ctx, {
-      color: colors.fabricationNote,
-      zOffsetMultiplier: 2.5,
-    })
+    const pathGeom = createSilkscreenPathGeom(
+      {
+        route: note.route,
+        stroke_width: this.parseNumber(note.stroke_width, 0.15),
+        layer: this.normalizeLayer(note.layer),
+      },
+      this.ctx,
+      {
+        color: colors.fabricationNote,
+        zOffsetMultiplier: 2.5,
+      },
+    )
 
     if (pathGeom) {
       this.fabricationNotePathGeoms.push(pathGeom)

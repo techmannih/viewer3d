@@ -166,7 +166,7 @@ export function createSilkscreenTextureForLayer({
         createSilkscreenTextGeoms(textElement)
 
       const textStrokeWidth =
-        Math.min(Math.max(0.01, fontSize * 0.1), fontSize * 0.05) *
+        Math.max(0.01, Math.min(fontSize * 0.1, fontSize * 0.05)) *
         traceTextureResolution
 
       ctx.lineWidth = textStrokeWidth
