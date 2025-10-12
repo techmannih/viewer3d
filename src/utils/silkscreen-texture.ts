@@ -1,14 +1,10 @@
 import * as THREE from "three"
-import { vectorText } from "@jscad/modeling/src/text"
-import {
-  compose,
-  translate,
-  rotate,
-  applyToPoint,
-  Matrix,
-} from "transformation-matrix"
 import type { AnyCircuitElement } from "circuit-json"
 import { su } from "@tscircuit/circuit-json-util"
+import {
+  createSilkscreenTextGeoms,
+  PcbTextElementForGeoms,
+} from "../geoms/create-geoms-for-silkscreen-text"
 
 export function createSilkscreenTextureForLayer({
   layer,
@@ -16,19 +12,49 @@ export function createSilkscreenTextureForLayer({
   boardData,
   silkscreenColor = "rgb(255,255,255)",
   traceTextureResolution,
+  fabricationNoteColor = "rgb(255,215,0)",
 }: {
   layer: "top" | "bottom"
   circuitJson: AnyCircuitElement[]
   boardData: any
   silkscreenColor?: string
   traceTextureResolution: number
+  fabricationNoteColor?: string
 }): THREE.CanvasTexture | null {
   const pcbSilkscreenTexts = su(circuitJson).pcb_silkscreen_text.list()
   const pcbSilkscreenPaths = su(circuitJson).pcb_silkscreen_path.list()
+  const pcbFabricationNoteTexts = su(
+    circuitJson,
+  ).pcb_fabrication_note_text.list()
+  const pcbFabricationNotePaths = su(
+    circuitJson,
+  ).pcb_fabrication_note_path.list()
+  const pcbComponents = su(circuitJson).pcb_component.list()
 
-  const textsOnLayer = pcbSilkscreenTexts.filter((t) => t.layer === layer)
-  const pathsOnLayer = pcbSilkscreenPaths.filter((p) => p.layer === layer)
-  if (textsOnLayer.length === 0 && pathsOnLayer.length === 0) return null
+  const normalizeLayer = (value: any): "top" | "bottom" =>
+    value === "bottom" ? "bottom" : "top"
+
+  const textsOnLayer = pcbSilkscreenTexts.filter(
+    (t) => normalizeLayer(t.layer) === layer,
+  )
+  const pathsOnLayer = pcbSilkscreenPaths.filter(
+    (p) => normalizeLayer(p.layer) === layer,
+  )
+  const fabricationTextsOnLayer = pcbFabricationNoteTexts.filter(
+    (t) => normalizeLayer(t.layer) === layer,
+  )
+  const fabricationPathsOnLayer = pcbFabricationNotePaths.filter(
+    (p) => normalizeLayer(p.layer) === layer,
+  )
+
+  if (
+    textsOnLayer.length === 0 &&
+    pathsOnLayer.length === 0 &&
+    fabricationTextsOnLayer.length === 0 &&
+    fabricationPathsOnLayer.length === 0
+  ) {
+    return null
+  }
 
   const canvas = document.createElement("canvas")
   const canvasWidth = Math.floor(boardData.width * traceTextureResolution)
@@ -43,132 +69,133 @@ export function createSilkscreenTextureForLayer({
     ctx.scale(1, -1)
   }
 
-  ctx.strokeStyle = silkscreenColor
-  ctx.fillStyle = silkscreenColor
+  const boardCenter = boardData.center
+    ? { x: boardData.center.x, y: boardData.center.y }
+    : { x: 0, y: 0 }
 
-  // Draw Silkscreen Paths
-  pathsOnLayer.forEach((path: any) => {
-    if (path.route.length < 2) return
-    ctx.beginPath()
-    ctx.lineWidth = (path.stroke_width || 0.1) * traceTextureResolution
-    ctx.lineCap = "round"
-    ctx.lineJoin = "round"
-    path.route.forEach((point: any, index: number) => {
-      const canvasX =
-        (point.x - boardData.center.x + boardData.width / 2) *
-        traceTextureResolution
-      const canvasY =
-        (-(point.y - boardData.center.y) + boardData.height / 2) *
-        traceTextureResolution
-      if (index === 0) ctx.moveTo(canvasX, canvasY)
-      else ctx.lineTo(canvasX, canvasY)
-    })
-    ctx.stroke()
+  const componentCenters = new Map<string, { x: number; y: number }>()
+  pcbComponents.forEach((component: any) => {
+    if (component?.pcb_component_id && component?.center) {
+      componentCenters.set(component.pcb_component_id, {
+        x: component.center.x,
+        y: component.center.y,
+      })
+    }
   })
 
-  // Draw Silkscreen Text
-  textsOnLayer.forEach((textS: any) => {
-    const fontSize = textS.font_size || 0.25
-    const textStrokeWidth =
-      Math.min(Math.max(0.01, fontSize * 0.1), fontSize * 0.05) *
-      traceTextureResolution
-    ctx.lineWidth = textStrokeWidth
-    ctx.lineCap = "butt"
-    ctx.lineJoin = "miter"
-    const rawTextOutlines = vectorText({
-      height: fontSize * 0.45,
-      input: textS.text,
-    })
-    const processedTextOutlines: Array<Array<[number, number]>> = []
-    rawTextOutlines.forEach((outline: any) => {
-      if (outline.length === 29) {
-        processedTextOutlines.push(
-          outline.slice(0, 15) as Array<[number, number]>,
-        )
-        processedTextOutlines.push(
-          outline.slice(14, 29) as Array<[number, number]>,
-        )
-      } else if (outline.length === 17) {
-        processedTextOutlines.push(
-          outline.slice(0, 10) as Array<[number, number]>,
-        )
-        processedTextOutlines.push(
-          outline.slice(9, 17) as Array<[number, number]>,
-        )
-      } else {
-        processedTextOutlines.push(outline as Array<[number, number]>)
+  const resolveAnchorPosition = (source: any) => {
+    if (source?.anchor_position) {
+      return {
+        x: source.anchor_position.x,
+        y: source.anchor_position.y,
       }
-    })
-    const points = processedTextOutlines.flat()
-    const textBounds = {
-      minX: points.length > 0 ? Math.min(...points.map((p) => p[0])) : 0,
-      maxX: points.length > 0 ? Math.max(...points.map((p) => p[0])) : 0,
-      minY: points.length > 0 ? Math.min(...points.map((p) => p[1])) : 0,
-      maxY: points.length > 0 ? Math.max(...points.map((p) => p[1])) : 0,
-    }
-    const textCenterX = (textBounds.minX + textBounds.maxX) / 2
-    const textCenterY = (textBounds.minY + textBounds.maxY) / 2
-
-    let xOff = -textCenterX
-    let yOff = -textCenterY
-
-    const alignment = textS.anchor_alignment || "center"
-
-    // Horizontal alignment
-    if (alignment.includes("left")) {
-      xOff = -textBounds.minX
-    } else if (alignment.includes("right")) {
-      xOff = -textBounds.maxX
     }
 
-    // Vertical alignment
-    if (alignment.includes("top")) {
-      yOff = -textBounds.maxY
-    } else if (alignment.includes("bottom")) {
-      yOff = -textBounds.minY
+    if (source?.pcb_component_id) {
+      const center = componentCenters.get(source.pcb_component_id)
+      if (center) {
+        return { x: center.x, y: center.y }
+      }
     }
 
-    const transformMatrices: Matrix[] = []
-    let rotationDeg = textS.ccw_rotation ?? 0
-    if (textS.layer === "bottom") {
-      transformMatrices.push(
-        translate(textCenterX, textCenterY),
-        { a: -1, b: 0, c: 0, d: 1, e: 0, f: 0 },
-        translate(-textCenterX, -textCenterY),
-      )
-      rotationDeg = -rotationDeg
-    }
-    if (rotationDeg) {
-      const rad = (rotationDeg * Math.PI) / 180
-      transformMatrices.push(
-        translate(textCenterX, textCenterY),
-        rotate(rad),
-        translate(-textCenterX, -textCenterY),
-      )
-    }
-    const finalTransformMatrix =
-      transformMatrices.length > 0 ? compose(...transformMatrices) : undefined
-    processedTextOutlines.forEach((segment) => {
+    return { x: boardCenter.x, y: boardCenter.y }
+  }
+
+  const toCanvas = (point: { x: number; y: number }) => ({
+    x:
+      (point.x - boardCenter.x + boardData.width / 2) * traceTextureResolution,
+    y:
+      (-(point.y - boardCenter.y) + boardData.height / 2) *
+      traceTextureResolution,
+  })
+
+  const drawPaths = (paths: any[], color: string, defaultStroke = 0.1) => {
+    paths.forEach((path) => {
+      if (!path?.route || path.route.length < 2) return
       ctx.beginPath()
-      segment.forEach((p, index) => {
-        let transformedP = { x: p[0], y: p[1] }
-        if (finalTransformMatrix) {
-          transformedP = applyToPoint(finalTransformMatrix, transformedP)
-        }
-        const pcbX = transformedP.x + xOff + textS.anchor_position.x
-        const pcbY = transformedP.y + yOff + textS.anchor_position.y
-        const canvasX =
-          (pcbX - boardData.center.x + boardData.width / 2) *
-          traceTextureResolution
-        const canvasY =
-          (-(pcbY - boardData.center.y) + boardData.height / 2) *
-          traceTextureResolution
-        if (index === 0) ctx.moveTo(canvasX, canvasY)
-        else ctx.lineTo(canvasX, canvasY)
+      ctx.strokeStyle = color
+      const strokeRaw = path.stroke_width ?? defaultStroke
+      const strokeWidth =
+        typeof strokeRaw === "number"
+          ? strokeRaw
+          : parseFloat(strokeRaw) || defaultStroke
+      ctx.lineWidth = strokeWidth * traceTextureResolution
+      ctx.lineCap = "round"
+      ctx.lineJoin = "round"
+      path.route.forEach((rawPoint: any, index: number) => {
+        const canvasPoint = toCanvas({ x: rawPoint.x, y: rawPoint.y })
+        if (index === 0) ctx.moveTo(canvasPoint.x, canvasPoint.y)
+        else ctx.lineTo(canvasPoint.x, canvasPoint.y)
       })
       ctx.stroke()
     })
-  })
+  }
+
+  const drawTextElements = (
+    elements: any[],
+    color: string,
+    defaultFontSize = 0.25,
+  ) => {
+    elements.forEach((textSource) => {
+      if (!textSource?.text) return
+
+      const fontSizeRaw = textSource.font_size ?? defaultFontSize
+      const fontSize =
+        typeof fontSizeRaw === "number"
+          ? fontSizeRaw
+          : parseFloat(fontSizeRaw) || defaultFontSize
+      const anchorPosition = resolveAnchorPosition(textSource)
+      const layerValue = normalizeLayer(textSource.layer)
+      const rotationRaw =
+        textSource.ccw_rotation ?? textSource.rotation ?? 0
+      const ccwRotation =
+        typeof rotationRaw === "number"
+          ? rotationRaw
+          : parseFloat(rotationRaw) || 0
+
+      const textElement: PcbTextElementForGeoms = {
+        text: textSource.text,
+        font_size: fontSize,
+        anchor_position: anchorPosition,
+        anchor_alignment: textSource.anchor_alignment ?? "center",
+        layer: layerValue,
+        ccw_rotation,
+      }
+
+      const { textOutlines, xOffset, yOffset } =
+        createSilkscreenTextGeoms(textElement)
+
+      const textStrokeWidth =
+        Math.min(Math.max(0.01, fontSize * 0.1), fontSize * 0.05) *
+        traceTextureResolution
+
+      ctx.lineWidth = textStrokeWidth
+      ctx.lineCap = "butt"
+      ctx.lineJoin = "miter"
+      ctx.strokeStyle = color
+      ctx.fillStyle = color
+
+      textOutlines.forEach((segment) => {
+        if (!segment || segment.length === 0) return
+        ctx.beginPath()
+        segment.forEach((point, index) => {
+          const pcbPoint = {
+            x: point[0] + xOffset + anchorPosition.x,
+            y: point[1] + yOffset + anchorPosition.y,
+          }
+          const canvasPoint = toCanvas(pcbPoint)
+          if (index === 0) ctx.moveTo(canvasPoint.x, canvasPoint.y)
+          else ctx.lineTo(canvasPoint.x, canvasPoint.y)
+        })
+        ctx.stroke()
+      })
+    })
+  }
+
+  drawPaths(pathsOnLayer, silkscreenColor, 0.1)
+  drawPaths(fabricationPathsOnLayer, fabricationNoteColor, 0.15)
+  drawTextElements(textsOnLayer, silkscreenColor)
+  drawTextElements(fabricationTextsOnLayer, fabricationNoteColor)
   const texture = new THREE.CanvasTexture(canvas)
   texture.generateMipmaps = true
   texture.minFilter = THREE.LinearMipmapLinearFilter

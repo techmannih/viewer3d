@@ -6,10 +6,20 @@ import {
   applyToPoint,
   Matrix,
 } from "transformation-matrix"
-import { PcbSilkscreenText } from "circuit-json"
+
+export interface PcbTextElementForGeoms {
+  text: string
+  font_size: number
+  anchor_position: { x: number; y: number }
+  layer: "top" | "bottom"
+  anchor_alignment?: string | null
+  ccw_rotation?: number | null
+}
 
 // Generate 2D text outlines
-export function createSilkscreenTextGeoms(silkscreenText: PcbSilkscreenText) {
+export function createSilkscreenTextGeoms(
+  silkscreenText: PcbTextElementForGeoms,
+) {
   const textOutlines = vectorText({
     height: silkscreenText.font_size * 0.45,
     input: silkscreenText.text,

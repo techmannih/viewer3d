@@ -317,11 +317,15 @@ export const useManifoldBoardBuilder = (
 
       // --- Process Silkscreen (as Textures) ---
       const silkscreenColor = "rgb(255,255,255)" // White
+      const fabricationNoteColorArr =
+        defaultColors.fabricationNote ?? [1, 0.85, 0.2]
+      const fabricationNoteColor = `rgb(${Math.round(fabricationNoteColorArr[0] * 255)}, ${Math.round(fabricationNoteColorArr[1] * 255)}, ${Math.round(fabricationNoteColorArr[2] * 255)})`
       currentTextures.topSilkscreen = createSilkscreenTextureForLayer({
         layer: "top",
         circuitJson,
         boardData,
         silkscreenColor,
+        fabricationNoteColor,
         traceTextureResolution: TRACE_TEXTURE_RESOLUTION,
       })
       currentTextures.bottomSilkscreen = createSilkscreenTextureForLayer({
@@ -329,6 +333,7 @@ export const useManifoldBoardBuilder = (
         circuitJson,
         boardData,
         silkscreenColor,
+        fabricationNoteColor,
         traceTextureResolution: TRACE_TEXTURE_RESOLUTION,
       })
       setTextures(currentTextures)

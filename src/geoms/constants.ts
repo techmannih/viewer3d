@@ -9,6 +9,7 @@ export const colors = {
   fr4GreenSolderWithMask: [0x00 / 255, 0x98 / 255, 0x13 / 255],
   fr1Copper: [0.8, 0.4, 0.2],
   fr1CopperSolderWithMask: [0.9, 0.6, 0.2],
+  fabricationNote: [1, 0.85, 0.2],
 } satisfies Record<string, RGB>
 
 // Constants for Manifold processing
