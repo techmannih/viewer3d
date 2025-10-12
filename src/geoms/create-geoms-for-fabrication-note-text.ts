@@ -19,9 +19,13 @@ function getAnchorPosition(
   if (!note.anchor_position) return fallback
   const { x, y } = note.anchor_position
   const parsedX =
-    typeof x === "string" ? Number.parseFloat(x) || fallback.x : x ?? fallback.x
+    typeof x === "string"
+      ? Number.parseFloat(x) || fallback.x
+      : (x ?? fallback.x)
   const parsedY =
-    typeof y === "string" ? Number.parseFloat(y) || fallback.y : y ?? fallback.y
+    typeof y === "string"
+      ? Number.parseFloat(y) || fallback.y
+      : (y ?? fallback.y)
   return { x: parsedX, y: parsedY }
 }
 

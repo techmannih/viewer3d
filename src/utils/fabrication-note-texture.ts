@@ -88,13 +88,8 @@ export function createFabricationNoteTextureForLayer({
   })
 
   textsOnLayer.forEach((text) => {
-    const {
-      textOutlines,
-      xOffset,
-      yOffset,
-      anchorPosition,
-      fontSize,
-    } = createFabricationNoteTextGeoms(text)
+    const { textOutlines, xOffset, yOffset, anchorPosition, fontSize } =
+      createFabricationNoteTextGeoms(text)
 
     if (textOutlines.length === 0) return
 
@@ -113,11 +108,9 @@ export function createFabricationNoteTextureForLayer({
         const pcbX = point[0] + xOffset + anchorPosition.x
         const pcbY = point[1] + yOffset + anchorPosition.y
         const canvasX =
-          (pcbX - boardCenter.x + boardWidth / 2) *
-          traceTextureResolution
+          (pcbX - boardCenter.x + boardWidth / 2) * traceTextureResolution
         const canvasY =
-          (-(pcbY - boardCenter.y) + boardHeight / 2) *
-          traceTextureResolution
+          (-(pcbY - boardCenter.y) + boardHeight / 2) * traceTextureResolution
         if (index === 0) ctx.moveTo(canvasX, canvasY)
         else ctx.lineTo(canvasX, canvasY)
       })

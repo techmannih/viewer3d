@@ -9,11 +9,7 @@ import type { PcbFabricationNotePath } from "circuit-json"
 import type { GeomContext } from "../GeomContext"
 import { M } from "./constants"
 
-export const FABRICATION_NOTE_COLOR: [number, number, number] = [
-  1,
-  0.8,
-  0.2,
-]
+export const FABRICATION_NOTE_COLOR: [number, number, number] = [1, 0.8, 0.2]
 
 export function createFabricationNotePathGeom(
   path: PcbFabricationNotePath,
@@ -35,7 +31,10 @@ export function createFabricationNotePathGeom(
     typeof rawStrokeWidth === "string"
       ? Number.parseFloat(rawStrokeWidth) || 0.1
       : rawStrokeWidth
-  const expandedPath = expand({ delta: strokeWidth / 2, corners: "round" }, pathLine)
+  const expandedPath = expand(
+    { delta: strokeWidth / 2, corners: "round" },
+    pathLine,
+  )
 
   const layerSign = path.layer === "bottom" ? -1 : 1
   const zPos = (layerSign * ctx.pcbThickness) / 2 + layerSign * M * 2.5
