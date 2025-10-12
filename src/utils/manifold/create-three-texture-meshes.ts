@@ -65,5 +65,21 @@ export function createTextureMeshes(
   )
   if (bottomSilkscreenMesh) meshes.push(bottomSilkscreenMesh)
 
+  const topFabricationNoteMesh = createTexturePlane(
+    textures.topFabricationNotes,
+    pcbThickness / 2 + 0.019,
+    false,
+    "fabrication-note",
+  )
+  if (topFabricationNoteMesh) meshes.push(topFabricationNoteMesh)
+
+  const bottomFabricationNoteMesh = createTexturePlane(
+    textures.bottomFabricationNotes,
+    -pcbThickness / 2 - 0.019,
+    true,
+    "fabrication-note",
+  )
+  if (bottomFabricationNoteMesh) meshes.push(bottomFabricationNoteMesh)
+
   return meshes
 }
