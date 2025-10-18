@@ -18,6 +18,7 @@ import { STLModel } from "./three-components/STLModel"
 import { VisibleSTLModel } from "./three-components/VisibleSTLModel"
 import { ThreeErrorBoundary } from "./three-components/ThreeErrorBoundary"
 import { tuple } from "./utils/tuple"
+import { boardAnchorPosition, boardBoundingBox } from "./utils/board-anchor"
 
 interface Props {
   /**
@@ -54,51 +55,53 @@ export const CadViewerJscad = forwardRef<
     // Use the new hook to manage board geometry building
     const boardGeom = useBoardGeomBuilder(internalCircuitJson)
 
-    const initialCameraPosition = useMemo(() => {
-      if (!internalCircuitJson) return [5, 5, 5] as const
+    const boardData = useMemo(() => {
+      if (!internalCircuitJson) return null
       try {
-        const board = su(internalCircuitJson as any).pcb_board.list()[0]
-        if (!board) return [5, 5, 5] as const
-        const { width, height } = board
-
-        if (!width && !height) {
-          return [5, 5, 5] as const
-        }
-
-        const minCameraDistance = 5
-        const adjustedBoardWidth = Math.max(width, minCameraDistance)
-        const adjustedBoardHeight = Math.max(height, minCameraDistance)
-        const largestDim = Math.max(adjustedBoardWidth, adjustedBoardHeight)
-        return [largestDim / 2, largestDim / 2, largestDim] as const
+        return su(internalCircuitJson as any).pcb_board.list()[0] ?? null
       } catch (e) {
         console.error(e)
-        return [5, 5, 5] as const
+        return null
       }
     }, [internalCircuitJson])
+
+    const boardBounds = useMemo(() => {
+      if (!boardData) return null
+      return boardBoundingBox(boardData)
+    }, [boardData])
 
     const boardDimensions = useMemo(() => {
-      if (!internalCircuitJson) return undefined
-      try {
-        const board = su(internalCircuitJson as any).pcb_board.list()[0]
-        if (!board) return undefined
-        return { width: board.width ?? 0, height: board.height ?? 0 }
-      } catch (e) {
-        console.error(e)
-        return undefined
+      if (!boardData) return undefined
+      if (!boardBounds) {
+        return { width: 0, height: 0 }
       }
-    }, [internalCircuitJson])
+      return {
+        width: boardBounds.maxX - boardBounds.minX,
+        height: boardBounds.maxY - boardBounds.minY,
+      }
+    }, [boardData, boardBounds])
 
     const boardCenter = useMemo(() => {
-      if (!internalCircuitJson) return undefined
-      try {
-        const board = su(internalCircuitJson as any).pcb_board.list()[0]
-        if (!board || !board.center) return undefined
-        return { x: board.center.x, y: board.center.y }
-      } catch (e) {
-        console.error(e)
-        return undefined
+      if (!boardData) return undefined
+      if (boardBounds) {
+        return {
+          x: (boardBounds.minX + boardBounds.maxX) / 2,
+          y: (boardBounds.minY + boardBounds.maxY) / 2,
+        }
       }
-    }, [internalCircuitJson])
+      const fallbackAnchor = boardAnchorPosition(boardData)
+      return fallbackAnchor ? { x: fallbackAnchor.x, y: fallbackAnchor.y } : undefined
+    }, [boardData, boardBounds])
+
+    const initialCameraPosition = useMemo(() => {
+      if (!boardDimensions) return [5, 5, 5] as const
+      const width = boardDimensions.width ?? 0
+      const height = boardDimensions.height ?? 0
+      const safeWidth = Math.max(width, 1)
+      const safeHeight = Math.max(height, 1)
+      const largestDim = Math.max(safeWidth, safeHeight, 5)
+      return [largestDim / 2, largestDim / 2, largestDim] as const
+    }, [boardDimensions])
 
     // Use the state `boardGeom` which starts simplified and gets updated
     const { stls: boardStls, loading } = useStlsFromGeom(boardGeom)

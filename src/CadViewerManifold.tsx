@@ -13,6 +13,7 @@ import { Error3d } from "./three-components/Error3d"
 import { ThreeErrorBoundary } from "./three-components/ThreeErrorBoundary"
 import { createGeometryMeshes } from "./utils/manifold/create-three-geometry-meshes"
 import { createTextureMeshes } from "./utils/manifold/create-three-texture-meshes"
+import { boardAnchorPosition, boardBoundingBox } from "./utils/board-anchor"
 import { useLayerVisibility } from "./contexts/LayerVisibilityContext"
 
 declare global {
@@ -238,27 +239,43 @@ try {
     [circuitJson],
   )
 
+  const boardBounds = useMemo(() => {
+    if (!boardData) return null
+    return boardBoundingBox(boardData)
+  }, [boardData])
+
   const boardDimensions = useMemo(() => {
     if (!boardData) return undefined
-    const { width = 0, height = 0 } = boardData
-    return { width, height }
-  }, [boardData])
+    if (!boardBounds) {
+      return { width: 0, height: 0 }
+    }
+    return {
+      width: boardBounds.maxX - boardBounds.minX,
+      height: boardBounds.maxY - boardBounds.minY,
+    }
+  }, [boardData, boardBounds])
 
   const boardCenter = useMemo(() => {
     if (!boardData) return undefined
-    const { center } = boardData
-    if (!center) return undefined
-    return { x: center.x, y: center.y }
-  }, [boardData])
+    if (boardBounds) {
+      return {
+        x: (boardBounds.minX + boardBounds.maxX) / 2,
+        y: (boardBounds.minY + boardBounds.maxY) / 2,
+      }
+    }
+    const fallbackAnchor = boardAnchorPosition(boardData)
+    return fallbackAnchor ? { x: fallbackAnchor.x, y: fallbackAnchor.y } : undefined
+  }, [boardData, boardBounds])
 
   const initialCameraPosition = useMemo(() => {
-    if (!boardData) return [5, 5, 5] as const
-    const { width = 0, height = 0 } = boardData
+    if (!boardDimensions) return [5, 5, 5] as const
+    const width = boardDimensions.width ?? 0
+    const height = boardDimensions.height ?? 0
     const safeWidth = Math.max(width, 1)
     const safeHeight = Math.max(height, 1)
     const largestDim = Math.max(safeWidth, safeHeight, 5)
     return [largestDim * 0.75, largestDim * 0.75, largestDim * 0.75] as const
-  }, [boardData])
+  }, [boardDimensions])
 
   if (manifoldLoadingError) {
     return (
