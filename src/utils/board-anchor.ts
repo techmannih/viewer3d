@@ -5,24 +5,24 @@ type PointLike = { x?: number | string | null; y?: number | string | null } | nu
 export type BoardAnchorAlignment =
   | "center"
   | "top_left"
-  | "top_center"
   | "top_right"
-  | "center_left"
-  | "center_right"
   | "bottom_left"
-  | "bottom_center"
   | "bottom_right"
+  | "top"
+  | "bottom"
+  | "left"
+  | "right"
 
 const VALID_ALIGNMENTS: Record<string, BoardAnchorAlignment> = {
   center: "center",
   top_left: "top_left",
-  top_center: "top_center",
   top_right: "top_right",
-  center_left: "center_left",
-  center_right: "center_right",
   bottom_left: "bottom_left",
-  bottom_center: "bottom_center",
   bottom_right: "bottom_right",
+  top: "top",
+  bottom: "bottom",
+  left: "left",
+  right: "right",
 }
 
 const toFiniteNumber = (value: unknown): number | null => {
@@ -48,33 +48,49 @@ const toPoint = (point: PointLike): { x: number; y: number } | null => {
 
 const resolveAnchorPositionCandidates = (board?: PcbBoard | null): PointLike[] => {
   if (!board) return []
-  const autoSize: any = (board as any).auto_size
+  const anyBoard = board as any
+  const autoSize: any = anyBoard?.auto_size
   const candidates: PointLike[] = []
   if (autoSize?.anchor_position) candidates.push(autoSize.anchor_position)
   if (autoSize?.anchor?.position) candidates.push(autoSize.anchor.position)
-  if ((board as any).anchor_position) candidates.push((board as any).anchor_position)
-  if ((board as any).anchor?.position)
-    candidates.push((board as any).anchor.position as PointLike)
+  if (anyBoard?.anchor_position) candidates.push(anyBoard.anchor_position)
+  if (anyBoard?.anchor?.position)
+    candidates.push(anyBoard.anchor.position as PointLike)
+  if (anyBoard?.board_anchor_position)
+    candidates.push(anyBoard.board_anchor_position as PointLike)
+  if (anyBoard?.board_anchor?.position)
+    candidates.push(anyBoard.board_anchor.position as PointLike)
+  if (anyBoard?.boardAnchorPosition)
+    candidates.push(anyBoard.boardAnchorPosition as PointLike)
+  if (anyBoard?.boardAnchor?.position)
+    candidates.push(anyBoard.boardAnchor.position as PointLike)
   if (board.center) candidates.push(board.center as PointLike)
   return candidates
 }
 
 const normalizeAlignment = (value: unknown): BoardAnchorAlignment | null => {
   if (typeof value !== "string") return null
-  const normalized = value.toLowerCase().replace(/-/g, "_")
+  const normalized = value.toLowerCase().replace(/[-\s]+/g, "_")
   return VALID_ALIGNMENTS[normalized] ?? null
 }
 
 const resolveAnchorAlignmentCandidates = (board?: PcbBoard | null): unknown[] => {
   if (!board) return []
-  const autoSize: any = (board as any).auto_size
+  const anyBoard = board as any
+  const autoSize: any = anyBoard?.auto_size
   const candidates: unknown[] = []
   if (autoSize?.anchor_alignment) candidates.push(autoSize.anchor_alignment)
   if (autoSize?.anchor?.alignment) candidates.push(autoSize.anchor.alignment)
-  if ((board as any).anchor_alignment)
-    candidates.push((board as any).anchor_alignment)
-  if ((board as any).anchor?.alignment)
-    candidates.push((board as any).anchor.alignment)
+  if (anyBoard?.anchor_alignment) candidates.push(anyBoard.anchor_alignment)
+  if (anyBoard?.anchor?.alignment) candidates.push(anyBoard.anchor.alignment)
+  if (anyBoard?.board_anchor_alignment)
+    candidates.push(anyBoard.board_anchor_alignment)
+  if (anyBoard?.board_anchor?.alignment)
+    candidates.push(anyBoard.board_anchor.alignment)
+  if (anyBoard?.boardAnchorAlignment)
+    candidates.push(anyBoard.boardAnchorAlignment)
+  if (anyBoard?.boardAnchor?.alignment)
+    candidates.push(anyBoard.boardAnchor.alignment)
   return candidates
 }
 
