@@ -9,6 +9,10 @@ import {
   tracesMaterialColors,
 } from "../geoms/constants"
 import { createBoardGeomWithOutline } from "../geoms/create-board-with-outline"
+import {
+  boardCenterFromAnchor,
+  boardDimensionsFromBoard,
+} from "../utils/board-anchor"
 
 /**
  * Creates a simplified board geometry (just the board shape, no components/holes).
@@ -34,9 +38,11 @@ export const createSimplifiedBoardGeom = (
       pcbThickness,
     )
   } else {
+    const { width, height } = boardDimensionsFromBoard(board)
+    const { x: centerX, y: centerY } = boardCenterFromAnchor(board)
     boardGeom = cuboid({
-      size: [board.width, board.height, pcbThickness],
-      center: [board.center.x, board.center.y, 0],
+      size: [width, height, pcbThickness],
+      center: [centerX, centerY, 0],
     })
   }
 
