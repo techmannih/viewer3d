@@ -9,6 +9,7 @@ import {
 } from "transformation-matrix"
 import type { AnyCircuitElement } from "circuit-json"
 import { su } from "@tscircuit/circuit-json-util"
+import { boardCenterFromAnchor, boardDimensionsFromBoard } from "./board-anchor"
 
 export function createSilkscreenTextureForLayer({
   layer,
@@ -30,9 +31,14 @@ export function createSilkscreenTextureForLayer({
   const pathsOnLayer = pcbSilkscreenPaths.filter((p) => p.layer === layer)
   if (textsOnLayer.length === 0 && pathsOnLayer.length === 0) return null
 
+  const { width, height } = boardDimensionsFromBoard(boardData)
+  if (width <= 0 || height <= 0) return null
+
+  const boardCenter = boardCenterFromAnchor(boardData)
+
   const canvas = document.createElement("canvas")
-  const canvasWidth = Math.floor(boardData.width * traceTextureResolution)
-  const canvasHeight = Math.floor(boardData.height * traceTextureResolution)
+  const canvasWidth = Math.floor(width * traceTextureResolution)
+  const canvasHeight = Math.floor(height * traceTextureResolution)
   canvas.width = canvasWidth
   canvas.height = canvasHeight
   const ctx = canvas.getContext("2d")
@@ -55,11 +61,9 @@ export function createSilkscreenTextureForLayer({
     ctx.lineJoin = "round"
     path.route.forEach((point: any, index: number) => {
       const canvasX =
-        (point.x - boardData.center.x + boardData.width / 2) *
-        traceTextureResolution
+        (point.x - boardCenter.x + width / 2) * traceTextureResolution
       const canvasY =
-        (-(point.y - boardData.center.y) + boardData.height / 2) *
-        traceTextureResolution
+        (-(point.y - boardCenter.y) + height / 2) * traceTextureResolution
       if (index === 0) ctx.moveTo(canvasX, canvasY)
       else ctx.lineTo(canvasX, canvasY)
     })
@@ -158,11 +162,9 @@ export function createSilkscreenTextureForLayer({
         const pcbX = transformedP.x + xOff + textS.anchor_position.x
         const pcbY = transformedP.y + yOff + textS.anchor_position.y
         const canvasX =
-          (pcbX - boardData.center.x + boardData.width / 2) *
-          traceTextureResolution
+          (pcbX - boardCenter.x + width / 2) * traceTextureResolution
         const canvasY =
-          (-(pcbY - boardData.center.y) + boardData.height / 2) *
-          traceTextureResolution
+          (-(pcbY - boardCenter.y) + height / 2) * traceTextureResolution
         if (index === 0) ctx.moveTo(canvasX, canvasY)
         else ctx.lineTo(canvasX, canvasY)
       })

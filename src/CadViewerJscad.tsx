@@ -18,6 +18,10 @@ import { STLModel } from "./three-components/STLModel"
 import { VisibleSTLModel } from "./three-components/VisibleSTLModel"
 import { ThreeErrorBoundary } from "./three-components/ThreeErrorBoundary"
 import { tuple } from "./utils/tuple"
+import {
+  boardCenterFromAnchor,
+  boardDimensionsFromBoard,
+} from "./utils/board-anchor"
 
 interface Props {
   /**
@@ -59,7 +63,7 @@ export const CadViewerJscad = forwardRef<
       try {
         const board = su(internalCircuitJson as any).pcb_board.list()[0]
         if (!board) return [5, 5, 5] as const
-        const { width, height } = board
+        const { width, height } = boardDimensionsFromBoard(board)
 
         if (!width && !height) {
           return [5, 5, 5] as const
@@ -81,7 +85,7 @@ export const CadViewerJscad = forwardRef<
       try {
         const board = su(internalCircuitJson as any).pcb_board.list()[0]
         if (!board) return undefined
-        return { width: board.width ?? 0, height: board.height ?? 0 }
+        return boardDimensionsFromBoard(board)
       } catch (e) {
         console.error(e)
         return undefined
@@ -92,8 +96,8 @@ export const CadViewerJscad = forwardRef<
       if (!internalCircuitJson) return undefined
       try {
         const board = su(internalCircuitJson as any).pcb_board.list()[0]
-        if (!board || !board.center) return undefined
-        return { x: board.center.x, y: board.center.y }
+        if (!board) return undefined
+        return boardCenterFromAnchor(board)
       } catch (e) {
         console.error(e)
         return undefined

@@ -50,6 +50,7 @@ import {
   clampRectBorderRadius,
   extractRectBorderRadius,
 } from "./utils/rect-border-radius"
+import { boardCenterFromAnchor } from "./utils/board-anchor"
 
 const PAD_ROUNDED_SEGMENTS = 64
 const BOARD_CLIP_Z_MARGIN = 1
@@ -130,6 +131,7 @@ export class BoardGeomBuilder {
   private silkscreenPathGeoms: Geom3[] = []
   private copperPourGeoms: Geom3[] = []
   private boardClipGeom: Geom3 | null = null
+  private boardCenterPoint: { x: number; y: number }
 
   private state: BuilderState = "initializing"
   private currentIndex = 0
@@ -183,6 +185,7 @@ export class BoardGeomBuilder {
     ) as any
 
     this.ctx = { pcbThickness: this.board.thickness ?? 1.2 }
+    this.boardCenterPoint = boardCenterFromAnchor(this.board)
 
     // Start processing
     this.initializeBoard()
@@ -208,7 +211,7 @@ export class BoardGeomBuilder {
     } else {
       this.boardGeom = cuboid({
         size: [this.board.width, this.board.height, this.ctx.pcbThickness],
-        center: [this.board.center.x, this.board.center.y, 0],
+        center: [this.boardCenterPoint.x, this.boardCenterPoint.y, 0],
       })
       this.boardClipGeom = cuboid({
         size: [
@@ -216,7 +219,7 @@ export class BoardGeomBuilder {
           this.board.height + 2 * BOARD_CLIP_XY_OUTSET,
           clipDepth,
         ],
-        center: [this.board.center.x, this.board.center.y, 0],
+        center: [this.boardCenterPoint.x, this.boardCenterPoint.y, 0],
       })
     }
     this.state = "processing_pads"

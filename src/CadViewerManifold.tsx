@@ -14,6 +14,10 @@ import { ThreeErrorBoundary } from "./three-components/ThreeErrorBoundary"
 import { createGeometryMeshes } from "./utils/manifold/create-three-geometry-meshes"
 import { createTextureMeshes } from "./utils/manifold/create-three-texture-meshes"
 import { useLayerVisibility } from "./contexts/LayerVisibilityContext"
+import {
+  boardCenterFromAnchor,
+  boardDimensionsFromBoard,
+} from "./utils/board-anchor"
 
 declare global {
   interface Window {
@@ -240,20 +244,17 @@ try {
 
   const boardDimensions = useMemo(() => {
     if (!boardData) return undefined
-    const { width = 0, height = 0 } = boardData
-    return { width, height }
+    return boardDimensionsFromBoard(boardData)
   }, [boardData])
 
   const boardCenter = useMemo(() => {
     if (!boardData) return undefined
-    const { center } = boardData
-    if (!center) return undefined
-    return { x: center.x, y: center.y }
+    return boardCenterFromAnchor(boardData)
   }, [boardData])
 
   const initialCameraPosition = useMemo(() => {
     if (!boardData) return [5, 5, 5] as const
-    const { width = 0, height = 0 } = boardData
+    const { width, height } = boardDimensionsFromBoard(boardData)
     const safeWidth = Math.max(width, 1)
     const safeHeight = Math.max(height, 1)
     const largestDim = Math.max(safeWidth, safeHeight, 5)

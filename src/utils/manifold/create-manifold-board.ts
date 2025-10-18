@@ -3,6 +3,10 @@ import type {
   CrossSection as ManifoldCrossSection,
 } from "manifold-3d/manifold.d.ts"
 import type { PcbBoard } from "circuit-json"
+import {
+  boardCenterFromAnchor,
+  boardDimensionsFromBoard,
+} from "../board-anchor"
 
 const arePointsClockwise = (points: Array<[number, number]>): boolean => {
   let area = 0
@@ -62,13 +66,12 @@ export function createManifoldBoard(
         "Board outline has fewer than 3 points, falling back to rectangular board.",
       )
     }
+    const { width, height } = boardDimensionsFromBoard(boardData)
     // Fallback to cuboid if no outline or invalid outline
-    boardOp = Manifold.cube(
-      [boardData.width, boardData.height, pcbThickness],
-      true, // center (for all axes)
-    )
+    boardOp = Manifold.cube([width, height, pcbThickness], true)
     manifoldInstancesForCleanup.push(boardOp)
-    boardOp = boardOp.translate([boardData.center.x, boardData.center.y, 0])
+    const { x: centerX, y: centerY } = boardCenterFromAnchor(boardData)
+    boardOp = boardOp.translate([centerX, centerY, 0])
     manifoldInstancesForCleanup.push(boardOp) // Also track the translated op
   }
 
