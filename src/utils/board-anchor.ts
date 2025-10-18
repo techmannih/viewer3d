@@ -16,6 +16,10 @@ export type BoardAnchorAlignment =
   | "bottom"
   | "left"
   | "right"
+  | "top_center"
+  | "bottom_center"
+  | "center_left"
+  | "center_right"
 
 const VALID_ALIGNMENTS: Record<string, BoardAnchorAlignment> = {
   center: "center",
@@ -27,6 +31,14 @@ const VALID_ALIGNMENTS: Record<string, BoardAnchorAlignment> = {
   bottom: "bottom",
   left: "left",
   right: "right",
+  top_center: "top_center",
+  bottom_center: "bottom_center",
+  center_left: "center_left",
+  center_right: "center_right",
+  left_center: "center_left",
+  right_center: "center_right",
+  center_top: "top_center",
+  center_bottom: "bottom_center",
 }
 
 const toFiniteNumber = (value: unknown): number | null => {
