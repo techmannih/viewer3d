@@ -11,6 +11,7 @@ export const JscadModel = ({
   jscadPlan,
   positionOffset,
   rotationOffset,
+  rotationQuaternion,
   onHover,
   onUnhover,
   isHovered,
@@ -18,7 +19,8 @@ export const JscadModel = ({
 }: {
   jscadPlan: JscadOperation
   positionOffset?: [number, number, number]
-  rotationOffset?: [number, number, number]
+  rotationOffset?: [number, number, number] | THREE.Euler
+  rotationQuaternion?: THREE.Quaternion
   onHover: (e: any) => void
   onUnhover: () => void
   isHovered: boolean
@@ -57,16 +59,34 @@ export const JscadModel = ({
   useEffect(() => {
     if (!mesh) return
     if (positionOffset) mesh.position.fromArray(positionOffset)
-    if (rotationOffset) mesh.rotation.fromArray(rotationOffset)
+    if (rotationQuaternion) {
+      mesh.quaternion.copy(rotationQuaternion)
+    } else if (rotationOffset) {
+      if (Array.isArray(rotationOffset)) {
+        mesh.rotation.fromArray(rotationOffset)
+      } else {
+        mesh.rotation.copy(rotationOffset as THREE.Euler)
+      }
+    }
     if (scale !== undefined) mesh.scale.setScalar(scale)
   }, [
     mesh,
     positionOffset?.[0],
     positionOffset?.[1],
     positionOffset?.[2],
-    rotationOffset?.[0],
-    rotationOffset?.[1],
-    rotationOffset?.[2],
+    rotationQuaternion?.x,
+    rotationQuaternion?.y,
+    rotationQuaternion?.z,
+    rotationQuaternion?.w,
+    Array.isArray(rotationOffset)
+      ? rotationOffset[0]
+      : (rotationOffset as THREE.Euler | undefined)?.x,
+    Array.isArray(rotationOffset)
+      ? rotationOffset[1]
+      : (rotationOffset as THREE.Euler | undefined)?.y,
+    Array.isArray(rotationOffset)
+      ? rotationOffset[2]
+      : (rotationOffset as THREE.Euler | undefined)?.z,
     scale,
   ])
 

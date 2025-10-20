@@ -11,6 +11,7 @@ export function GltfModel({
   gltfUrl,
   position,
   rotation,
+  rotationQuaternion,
   onHover,
   onUnhover,
   isHovered,
@@ -18,7 +19,8 @@ export function GltfModel({
 }: {
   gltfUrl: string
   position?: [number, number, number]
-  rotation?: [number, number, number]
+  rotation?: [number, number, number] | THREE.Euler
+  rotationQuaternion?: THREE.Quaternion
   onHover: (e: any) => void
   onUnhover: () => void
   isHovered: boolean
@@ -50,16 +52,28 @@ export function GltfModel({
   useEffect(() => {
     if (!model) return
     if (position) model.position.fromArray(position)
-    if (rotation) model.rotation.fromArray(rotation)
+    if (rotationQuaternion) {
+      model.quaternion.copy(rotationQuaternion)
+    } else if (rotation) {
+      if (Array.isArray(rotation)) {
+        model.rotation.fromArray(rotation)
+      } else {
+        model.rotation.copy(rotation as THREE.Euler)
+      }
+    }
     if (scale !== undefined) model.scale.setScalar(scale)
   }, [
     model,
     position?.[0],
     position?.[1],
     position?.[2],
-    rotation?.[0],
-    rotation?.[1],
-    rotation?.[2],
+    rotationQuaternion?.x,
+    rotationQuaternion?.y,
+    rotationQuaternion?.z,
+    rotationQuaternion?.w,
+    Array.isArray(rotation) ? rotation[0] : (rotation as THREE.Euler | undefined)?.x,
+    Array.isArray(rotation) ? rotation[1] : (rotation as THREE.Euler | undefined)?.y,
+    Array.isArray(rotation) ? rotation[2] : (rotation as THREE.Euler | undefined)?.z,
     scale,
   ])
 
