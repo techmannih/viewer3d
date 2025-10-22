@@ -142,6 +142,74 @@ export const useContextMenu = ({ containerRef }: ContextMenuProps) => {
     }
   }, [menuVisible, handleClickAway])
 
+  const adjustMenuToViewport = useCallback(
+    (position: { x: number; y: number }) => {
+      const menuElement = menuRef.current
+      if (!menuElement) {
+        return position
+      }
+
+      const { width, height } = menuElement.getBoundingClientRect()
+      const viewportWidth = window.innerWidth
+      const viewportHeight = window.innerHeight
+      const viewportPadding = 8
+
+      let nextX = position.x
+      let nextY = position.y
+
+      if (nextX + width > viewportWidth - viewportPadding) {
+        nextX = Math.max(viewportWidth - width - viewportPadding, viewportPadding)
+      }
+
+      if (nextY + height > viewportHeight - viewportPadding) {
+        nextY = Math.max(
+          viewportHeight - height - viewportPadding,
+          viewportPadding,
+        )
+      }
+
+      if (nextX < viewportPadding) {
+        nextX = viewportPadding
+      }
+
+      if (nextY < viewportPadding) {
+        nextY = viewportPadding
+      }
+
+      return { x: nextX, y: nextY }
+    },
+    [],
+  )
+
+  useEffect(() => {
+    if (!menuVisible) {
+      return
+    }
+
+    const adjusted = adjustMenuToViewport(menuPos)
+    if (adjusted.x !== menuPos.x || adjusted.y !== menuPos.y) {
+      setMenuPos(adjusted)
+    }
+  }, [menuVisible, menuPos, adjustMenuToViewport])
+
+  useEffect(() => {
+    if (!menuVisible) {
+      return
+    }
+
+    const handleWindowChange = () => {
+      setMenuPos((prev) => adjustMenuToViewport(prev))
+    }
+
+    window.addEventListener("resize", handleWindowChange)
+    window.addEventListener("scroll", handleWindowChange, true)
+
+    return () => {
+      window.removeEventListener("resize", handleWindowChange)
+      window.removeEventListener("scroll", handleWindowChange, true)
+    }
+  }, [menuVisible, adjustMenuToViewport])
+
   const contextMenuEventHandlers = {
     onMouseDown: (e: React.MouseEvent) => {
       if (e.button === 2) {

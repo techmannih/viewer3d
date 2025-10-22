@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from "react"
+import { useState, useCallback, useRef, useEffect, type CSSProperties } from "react"
 import { CadViewerJscad } from "./CadViewerJscad"
 import CadViewerManifold from "./CadViewerManifold"
 import { useContextMenu } from "./hooks/useContextMenu"
@@ -15,7 +15,8 @@ const CadViewerInner = (props: any) => {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [autoRotate, setAutoRotate] = useState(true)
   const [autoRotateUserToggled, setAutoRotateUserToggled] = useState(false)
-  const { visibility, toggleLayer } = useLayerVisibility()
+  const [hoveredMenuIndex, setHoveredMenuIndex] = useState<number | null>(null)
+  const { toggleLayer } = useLayerVisibility()
 
   const {
     menuVisible,
@@ -45,6 +46,12 @@ const CadViewerInner = (props: any) => {
     setEngine(newEngine)
     setMenuVisible(false)
   }
+
+  useEffect(() => {
+    if (!menuVisible) {
+      setHoveredMenuIndex(null)
+    }
+  }, [menuVisible])
 
   useEffect(() => {
     const stored = window.localStorage.getItem("cadViewerEngine")
@@ -109,118 +116,130 @@ const CadViewerInner = (props: any) => {
       {menuVisible && (
         <div
           ref={menuRef}
+          role="menu"
+          aria-label="Viewer options"
           style={{
             position: "fixed",
             top: menuPos.y,
             left: menuPos.x,
-            background: "#23272f",
-            color: "#f5f6fa",
-            borderRadius: 6,
-            boxShadow: "0 6px 24px 0 rgba(0,0,0,0.18)",
+            background: "#ffffff",
+            color: "#0f172a",
+            borderRadius: 8,
+            boxShadow: "0 18px 40px rgba(15, 23, 42, 0.18)",
             zIndex: 1000,
-            minWidth: 200,
-            border: "1px solid #353945",
-            padding: 0,
-            fontSize: 15,
+            minWidth: 220,
+            border: "1px solid rgba(15, 23, 42, 0.12)",
+            padding: "8px 0",
+            fontSize: 14,
             fontWeight: 500,
-            transition: "opacity 0.1s",
           }}
         >
-          <div
-            style={{
-              padding: "12px 18px",
-              cursor: "pointer",
+          {(() => {
+            const baseItemStyle: CSSProperties = {
               display: "flex",
               alignItems: "center",
-              gap: 10,
-              color: "#f5f6fa",
-              fontWeight: 500,
-              borderRadius: 6,
-              transition: "background 0.1s",
-            }}
-            onClick={() =>
-              handleMenuClick(engine === "jscad" ? "manifold" : "jscad")
-            }
-            onMouseOver={(e) => (e.currentTarget.style.background = "#2d313a")}
-            onMouseOut={(e) =>
-              (e.currentTarget.style.background = "transparent")
-            }
-          >
-            Switch to {engine === "jscad" ? "Manifold" : "JSCAD"} Engine
-            <span
-              style={{
-                fontSize: 12,
-                marginLeft: "auto",
-                opacity: 0.5,
-                fontWeight: 400,
-              }}
-            >
-              {engine === "jscad" ? "experimental" : "default"}
-            </span>
-          </div>
-          <div
-            style={{
-              padding: "12px 18px",
+              width: "100%",
+              background: "transparent",
+              border: "none",
+              padding: "10px 16px",
               cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              color: "#f5f6fa",
+              fontSize: 14,
               fontWeight: 500,
-              borderRadius: 6,
-              transition: "background 0.1s",
-            }}
-            onClick={() => {
-              toggleAutoRotate()
-              setMenuVisible(false)
-            }}
-            onMouseOver={(e) => (e.currentTarget.style.background = "#2d313a")}
-            onMouseOut={(e) =>
-              (e.currentTarget.style.background = "transparent")
+              color: "inherit",
+              textAlign: "left",
+              gap: 12,
             }
-          >
-            <span style={{ marginRight: 8 }}>{autoRotate ? "✔" : ""}</span>
-            Auto rotate
-          </div>
-          <div
-            style={{
-              padding: "12px 18px",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              color: "#f5f6fa",
-              fontWeight: 500,
-              borderRadius: 6,
-              transition: "background 0.1s",
-            }}
-            onClick={() => {
-              downloadGltf()
-              setMenuVisible(false)
-            }}
-            onMouseOver={(e) => (e.currentTarget.style.background = "#2d313a")}
-            onMouseOut={(e) =>
-              (e.currentTarget.style.background = "transparent")
-            }
-          >
-            Download GLTF
-          </div>
-          <AppearanceMenu />
+
+            const getItemStyle = (index: number): CSSProperties => ({
+              ...baseItemStyle,
+              backgroundColor: hoveredMenuIndex === index ? "#f1f5f9" : "transparent",
+            })
+
+            const setHover = (index: number | null) => () => setHoveredMenuIndex(index)
+
+            return (
+              <>
+                <button
+                  type="button"
+                  role="menuitem"
+                  style={getItemStyle(0)}
+                  onMouseEnter={setHover(0)}
+                  onFocus={setHover(0)}
+                  onMouseLeave={setHover(null)}
+                  onBlur={setHover(null)}
+                  onClick={() =>
+                    handleMenuClick(engine === "jscad" ? "manifold" : "jscad")
+                  }
+                >
+                  Switch to {engine === "jscad" ? "Manifold" : "JSCAD"} Engine
+                  <span
+                    style={{
+                      fontSize: 12,
+                      marginLeft: "auto",
+                      opacity: 0.6,
+                      fontWeight: 400,
+                    }}
+                  >
+                    {engine === "jscad" ? "experimental" : "default"}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  role="menuitemcheckbox"
+                  aria-checked={autoRotate}
+                  style={getItemStyle(1)}
+                  onMouseEnter={setHover(1)}
+                  onFocus={setHover(1)}
+                  onMouseLeave={setHover(null)}
+                  onBlur={setHover(null)}
+                  onClick={() => {
+                    toggleAutoRotate()
+                    setMenuVisible(false)
+                  }}
+                >
+                  <span style={{ width: 16 }}>
+                    {autoRotate ? "✔" : ""}
+                  </span>
+                  Auto rotate
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  style={getItemStyle(2)}
+                  onMouseEnter={setHover(2)}
+                  onFocus={setHover(2)}
+                  onMouseLeave={setHover(null)}
+                  onBlur={setHover(null)}
+                  onClick={() => {
+                    downloadGltf()
+                    setMenuVisible(false)
+                  }}
+                >
+                  Download GLTF
+                </button>
+              </>
+            )
+          })()}
+          <AppearanceMenu
+            onHoverChange={setHoveredMenuIndex}
+            hoveredIndex={hoveredMenuIndex}
+            nextIndex={3}
+          />
           <div
             style={{
               display: "flex",
               justifyContent: "center",
-              padding: "8px 0",
-              borderTop: "1px solid rgba(255, 255, 255, 0.1)",
-              marginTop: "8px",
+              padding: "10px 0 2px 0",
+              borderTop: "1px solid rgba(15, 23, 42, 0.08)",
+              marginTop: 6,
             }}
           >
             <span
               style={{
-                fontSize: 10,
-                opacity: 0.6,
-                fontWeight: 300,
-                color: "#c0c0c0",
+                fontSize: 11,
+                opacity: 0.55,
+                fontWeight: 400,
+                color: "#4b5563",
               }}
             >
               @tscircuit/3d-viewer@{packageJson.version}
