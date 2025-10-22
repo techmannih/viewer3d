@@ -1,158 +1,192 @@
-import { useState } from "react"
+import { useState, useRef, useEffect, type CSSProperties } from "react"
 import { useLayerVisibility } from "../contexts/LayerVisibilityContext"
-import type React from "react"
 
-const menuItemStyle: React.CSSProperties = {
-  padding: "8px 18px",
-  cursor: "pointer",
+interface AppearanceMenuProps {
+  onHoverChange: (index: number | null) => void
+  hoveredIndex: number | null
+  nextIndex: number
+}
+
+const separatorStyle: CSSProperties = {
+  borderTop: "1px solid rgba(15, 23, 42, 0.08)",
+  margin: "6px 0",
+}
+
+const baseMenuItemStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
-  gap: 10,
-  color: "#f5f6fa",
-  fontWeight: 400,
+  width: "100%",
+  background: "transparent",
+  border: "none",
+  padding: "10px 16px",
+  cursor: "pointer",
   fontSize: 14,
-  transition: "background 0.1s",
+  fontWeight: 500,
+  color: "#0f172a",
+  textAlign: "left",
+  gap: 12,
 }
 
-const checkmarkStyle: React.CSSProperties = {
-  width: 20,
+const submenuContainerStyle: CSSProperties = {
+  position: "absolute",
+  top: 0,
+  minWidth: 220,
+  background: "#ffffff",
+  border: "1px solid rgba(15, 23, 42, 0.12)",
+  borderRadius: 8,
+  boxShadow: "0 18px 40px rgba(15, 23, 42, 0.18)",
+  padding: "8px 0",
+  zIndex: 1100,
 }
 
-const handleMouseOver = (e: React.MouseEvent<HTMLDivElement>) => {
-  e.currentTarget.style.background = "#2d313a"
+const checkmarkCellStyle: CSSProperties = {
+  width: 16,
+  display: "inline-flex",
+  justifyContent: "center",
 }
 
-const handleMouseOut = (e: React.MouseEvent<HTMLDivElement>) => {
-  e.currentTarget.style.background = "transparent"
-}
+const submenuLayers = [
+  { key: "boardBody", label: "Board Body" },
+  { key: "topCopper", label: "Top Copper" },
+  { key: "bottomCopper", label: "Bottom Copper" },
+  { key: "topSilkscreen", label: "Top Silkscreen" },
+  { key: "bottomSilkscreen", label: "Bottom Silkscreen" },
+  { key: "smtModels", label: "CAD Models" },
+] as const
 
-export const AppearanceMenu = () => {
+type LayerKey = (typeof submenuLayers)[number]["key"]
+
+export const AppearanceMenu = ({
+  onHoverChange,
+  hoveredIndex,
+  nextIndex,
+}: AppearanceMenuProps) => {
   const { visibility, toggleLayer } = useLayerVisibility()
   const [showSubmenu, setShowSubmenu] = useState(false)
+  const [hoveredSubIndex, setHoveredSubIndex] = useState<number | null>(null)
+  const [submenuAlign, setSubmenuAlign] = useState<"left" | "right">("right")
+  const triggerRef = useRef<HTMLDivElement | null>(null)
+  const submenuRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (!showSubmenu) {
+      return
+    }
+
+    const trigger = triggerRef.current
+    const submenu = submenuRef.current
+
+    if (!trigger || !submenu) {
+      return
+    }
+
+    const triggerRect = trigger.getBoundingClientRect()
+    const submenuRect = submenu.getBoundingClientRect()
+    const viewportPadding = 8
+
+    if (
+      triggerRect.right + submenuRect.width >
+      window.innerWidth - viewportPadding
+    ) {
+      setSubmenuAlign("left")
+    } else {
+      setSubmenuAlign("right")
+    }
+  }, [showSubmenu])
+
+  const getSubmenuItemStyle = (index: number): CSSProperties => ({
+    ...baseMenuItemStyle,
+    fontWeight: 400,
+    backgroundColor: hoveredSubIndex === index ? "#f1f5f9" : "transparent",
+  })
+
+  const handleLayerToggle = (layer: LayerKey) => {
+    toggleLayer(layer)
+  }
 
   return (
     <>
+      <div style={separatorStyle} />
       <div
-        style={{
-          borderTop: "1px solid rgba(255, 255, 255, 0.1)",
-          margin: "8px 0",
+        ref={triggerRef}
+        style={{ position: "relative" }}
+        onMouseEnter={() => {
+          setShowSubmenu(true)
+          onHoverChange(nextIndex)
         }}
-      />
-      <div
-        style={{
-          padding: "8px 18px",
-          fontSize: 14,
-          color: "#f5f6fa",
-          fontWeight: 400,
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          transition: "background 0.1s",
-          position: "relative",
+        onMouseLeave={() => {
+          setShowSubmenu(false)
+          onHoverChange(null)
+          setHoveredSubIndex(null)
         }}
-        onMouseEnter={() => setShowSubmenu(true)}
-        onMouseLeave={() => setShowSubmenu(false)}
-        onMouseOver={handleMouseOver}
-        onMouseOut={handleMouseOut}
+        onFocusCapture={() => {
+          setShowSubmenu(true)
+          onHoverChange(nextIndex)
+        }}
+        onBlurCapture={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node)) {
+            setShowSubmenu(false)
+            onHoverChange(null)
+            setHoveredSubIndex(null)
+          }
+        }}
       >
-        <span>Appearance</span>
-        <span
+        <button
+          type="button"
+          role="menuitem"
+          aria-haspopup="true"
+          aria-expanded={showSubmenu}
           style={{
-            fontSize: 10,
-            transform: showSubmenu ? "rotate(90deg)" : "rotate(0deg)",
-            transition: "transform 0.2s",
-            display: "inline-block",
+            ...baseMenuItemStyle,
+            justifyContent: "space-between",
+            backgroundColor:
+              hoveredIndex === nextIndex || showSubmenu ? "#f1f5f9" : "transparent",
           }}
         >
-          ▶
-        </span>
-
+          Appearance
+          <span
+            style={{
+              fontSize: 11,
+              opacity: 0.7,
+              transition: "transform 0.2s",
+              transform: showSubmenu ? "rotate(90deg)" : "rotate(0deg)",
+            }}
+          >
+            ▶
+          </span>
+        </button>
         {showSubmenu && (
           <div
+            ref={submenuRef}
+            role="menu"
+            aria-label="Appearance options"
             style={{
-              position: "absolute",
-              left: "100%",
-              top: 0,
-              minWidth: 200,
-              background: "#23272f",
-              border: "1px solid rgba(255, 255, 255, 0.1)",
-              borderRadius: 6,
-              boxShadow: "0 4px 12px rgba(0, 0, 0, 0.4)",
-              zIndex: 1000,
-              marginTop: 8,
-              marginBottom: 8,
+              ...submenuContainerStyle,
+              left: submenuAlign === "right" ? "100%" : undefined,
+              right: submenuAlign === "left" ? "100%" : undefined,
+              marginLeft: submenuAlign === "right" ? 6 : undefined,
+              marginRight: submenuAlign === "left" ? 6 : undefined,
             }}
-            onMouseEnter={() => setShowSubmenu(true)}
-            onMouseLeave={() => setShowSubmenu(false)}
-            onClick={(e) => e.stopPropagation()}
           >
-            <div
-              style={menuItemStyle}
-              onClick={() => toggleLayer("boardBody")}
-              onMouseOver={handleMouseOver}
-              onMouseOut={handleMouseOut}
-            >
-              <span style={checkmarkStyle}>
-                {visibility.boardBody ? "✔" : ""}
-              </span>
-              Board Body
-            </div>
-            <div
-              style={menuItemStyle}
-              onClick={() => toggleLayer("topCopper")}
-              onMouseOver={handleMouseOver}
-              onMouseOut={handleMouseOut}
-            >
-              <span style={checkmarkStyle}>
-                {visibility.topCopper ? "✔" : ""}
-              </span>
-              Top Copper
-            </div>
-            <div
-              style={menuItemStyle}
-              onClick={() => toggleLayer("bottomCopper")}
-              onMouseOver={handleMouseOver}
-              onMouseOut={handleMouseOut}
-            >
-              <span style={checkmarkStyle}>
-                {visibility.bottomCopper ? "✔" : ""}
-              </span>
-              Bottom Copper
-            </div>
-            <div
-              style={menuItemStyle}
-              onClick={() => toggleLayer("topSilkscreen")}
-              onMouseOver={handleMouseOver}
-              onMouseOut={handleMouseOut}
-            >
-              <span style={checkmarkStyle}>
-                {visibility.topSilkscreen ? "✔" : ""}
-              </span>
-              Top Silkscreen
-            </div>
-            <div
-              style={menuItemStyle}
-              onClick={() => toggleLayer("bottomSilkscreen")}
-              onMouseOver={handleMouseOver}
-              onMouseOut={handleMouseOut}
-            >
-              <span style={checkmarkStyle}>
-                {visibility.bottomSilkscreen ? "✔" : ""}
-              </span>
-              Bottom Silkscreen
-            </div>
-            <div
-              style={menuItemStyle}
-              onClick={() => toggleLayer("smtModels")}
-              onMouseOver={handleMouseOver}
-              onMouseOut={handleMouseOut}
-            >
-              <span style={checkmarkStyle}>
-                {visibility.smtModels ? "✔" : ""}
-              </span>
-              CAD Models
-            </div>
+            {submenuLayers.map(({ key, label }, index) => (
+              <button
+                key={key}
+                type="button"
+                role="menuitemcheckbox"
+                aria-checked={visibility[key]}
+                style={getSubmenuItemStyle(index)}
+                onMouseEnter={() => setHoveredSubIndex(index)}
+                onMouseLeave={() => setHoveredSubIndex(null)}
+                onFocus={() => setHoveredSubIndex(index)}
+                onBlur={() => setHoveredSubIndex(null)}
+                onClick={() => handleLayerToggle(key)}
+              >
+                <span style={checkmarkCellStyle}>
+                  {visibility[key] ? "✔" : ""}
+                </span>
+                {label}
+              </button>
+            ))}
           </div>
         )}
       </div>
