@@ -1,0 +1,124 @@
+.viewer-context-menu {
+  position: fixed;
+  min-width: 220px;
+  max-width: 280px;
+  background-color: #ffffff;
+  color: #1f2937;
+  border-radius: 8px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  box-shadow:
+    0 18px 40px rgba(15, 23, 42, 0.18),
+    0 8px 24px rgba(15, 23, 42, 0.12);
+  padding: 6px 0;
+  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 13px;
+  white-space: nowrap;
+  z-index: 1000;
+  background-clip: padding-box;
+}
+
+.viewer-context-menu--submenu {
+  min-width: 200px;
+  z-index: 1001;
+}
+
+.viewer-context-menu__item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.2;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.viewer-context-menu__item:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.viewer-context-menu__item:hover,
+.viewer-context-menu__item:focus {
+  background-color: #e5e7eb;
+}
+
+.viewer-context-menu__item:active {
+  background-color: #d1d5db;
+}
+
+.viewer-context-menu__item--submenu {
+  justify-content: space-between;
+}
+
+.viewer-context-menu__meta {
+  margin-left: auto;
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.viewer-context-menu__submenu-arrow {
+  margin-left: 8px;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.viewer-context-menu__item--checkbox,
+.viewer-context-menu__item--radio {
+  padding-left: 32px;
+  position: relative;
+  text-align: left;
+}
+
+.viewer-context-menu__indicator {
+  position: absolute;
+  left: 12px;
+  width: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #2563eb;
+  font-size: 13px;
+}
+
+.viewer-context-menu__item.is-selected {
+  font-weight: 600;
+}
+
+.viewer-context-menu__separator {
+  height: 1px;
+  background-color: rgba(15, 23, 42, 0.12);
+  margin: 6px 12px;
+}
+
+.viewer-context-menu__label {
+  padding: 6px 12px;
+  font-size: 12px;
+  color: #6b7280;
+  text-align: center;
+}
+
+.viewer-context-menu__submenu {
+  position: relative;
+}
+
+.viewer-context-menu__item--checkbox .viewer-context-menu__indicator {
+  font-size: 11px;
+}
+
+.viewer-context-menu__item--radio .viewer-context-menu__indicator {
+  font-size: 16px;
+}
+
+.viewer-context-menu__group-title {
+  padding: 4px 12px;
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #9ca3af;
+  letter-spacing: 0.04em;
+}

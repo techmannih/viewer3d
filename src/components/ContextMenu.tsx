@@ -1,8 +1,19 @@
 import type React from "react"
-import { useState, useCallback } from "react"
+import {
+  useState,
+  useCallback,
+  useLayoutEffect,
+  useEffect,
+  useRef,
+} from "react"
 import { AppearanceMenu } from "./AppearanceMenu"
 import type { CameraPreset } from "../hooks/useCameraController"
 import packageJson from "../../package.json"
+import {
+  calculateMenuPosition,
+  calculateSubmenuPosition,
+} from "../utils/menuPositioning"
+import "./ContextMenu.css"
 
 interface ContextMenuProps {
   menuRef: React.RefObject<HTMLDivElement | null>
@@ -14,6 +25,7 @@ interface ContextMenuProps {
   onCameraPresetSelect: (preset: CameraPreset) => void
   onAutoRotateToggle: () => void
   onDownloadGltf: () => void
+  onRequestClose: () => void
 }
 
 const cameraOptions: CameraPreset[] = [
@@ -37,197 +49,216 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   onCameraPresetSelect,
   onAutoRotateToggle,
   onDownloadGltf,
+  onRequestClose,
 }) => {
-  const [activeSubmenu, setActiveSubmenu] = useState<"camera" | null>(null)
+  const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({
+    top: menuPos.y,
+    left: menuPos.x,
+  })
+  const [isMenuPositioned, setIsMenuPositioned] = useState(false)
 
-  const handleMenuItemHover = useCallback(
-    (event: React.MouseEvent<HTMLDivElement>, hovered: boolean) => {
-      event.currentTarget.style.background = hovered ? "#2d313a" : "transparent"
+  const cameraTriggerRef = useRef<HTMLButtonElement | null>(null)
+  const cameraMenuRef = useRef<HTMLDivElement | null>(null)
+  const [cameraOpen, setCameraOpen] = useState(false)
+  const [cameraMenuStyle, setCameraMenuStyle] = useState<React.CSSProperties>({
+    top: 0,
+    left: 0,
+  })
+  const [isCameraPositioned, setIsCameraPositioned] = useState(false)
+
+  const updateMenuPosition = useCallback(() => {
+    if (!menuRef.current) return
+    const width = menuRef.current.offsetWidth
+    const height = menuRef.current.offsetHeight
+    const nextPosition = calculateMenuPosition(menuPos.x, menuPos.y, {
+      width,
+      height,
+    })
+    setMenuStyle(nextPosition)
+    setIsMenuPositioned(true)
+  }, [menuPos.x, menuPos.y, menuRef])
+
+  useLayoutEffect(() => {
+    setIsMenuPositioned(false)
+    const frame = window.requestAnimationFrame(() => {
+      updateMenuPosition()
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [menuPos.x, menuPos.y, updateMenuPosition])
+
+  useEffect(() => {
+    const handle = () => updateMenuPosition()
+    handle()
+    window.addEventListener("resize", handle)
+    window.addEventListener("scroll", handle, true)
+    return () => {
+      window.removeEventListener("resize", handle)
+      window.removeEventListener("scroll", handle, true)
+    }
+  }, [updateMenuPosition])
+
+  const updateCameraMenuPosition = useCallback(() => {
+    if (!cameraTriggerRef.current || !cameraMenuRef.current) return
+    const triggerRect = cameraTriggerRef.current.getBoundingClientRect()
+    const width = cameraMenuRef.current.offsetWidth
+    const height = cameraMenuRef.current.offsetHeight
+    const nextPosition = calculateSubmenuPosition(triggerRect, {
+      width,
+      height,
+    })
+    setCameraMenuStyle(nextPosition)
+    setIsCameraPositioned(true)
+  }, [])
+
+  useLayoutEffect(() => {
+    if (!cameraOpen) return
+    setIsCameraPositioned(false)
+    const frame = window.requestAnimationFrame(() => {
+      updateCameraMenuPosition()
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [cameraOpen, updateCameraMenuPosition])
+
+  useEffect(() => {
+    if (!cameraOpen) return
+    const handle = () => updateCameraMenuPosition()
+    window.addEventListener("resize", handle)
+    window.addEventListener("scroll", handle, true)
+    return () => {
+      window.removeEventListener("resize", handle)
+      window.removeEventListener("scroll", handle, true)
+    }
+  }, [cameraOpen, updateCameraMenuPosition])
+
+  const closeCameraSubmenu = useCallback(() => {
+    setCameraOpen(false)
+    setIsCameraPositioned(false)
+  }, [])
+
+  const handleCameraPresetSelect = useCallback(
+    (preset: CameraPreset) => {
+      onCameraPresetSelect(preset)
+      closeCameraSubmenu()
+      onRequestClose()
     },
-    [],
+    [onCameraPresetSelect, closeCameraSubmenu, onRequestClose],
   )
+
+  const handleEngineSwitch = useCallback(() => {
+    onEngineSwitch(engine === "jscad" ? "manifold" : "jscad")
+    onRequestClose()
+  }, [engine, onEngineSwitch, onRequestClose])
+
+  const handleAutoRotateToggle = useCallback(() => {
+    onAutoRotateToggle()
+    onRequestClose()
+  }, [onAutoRotateToggle, onRequestClose])
+
+  const handleDownload = useCallback(() => {
+    onDownloadGltf()
+    onRequestClose()
+  }, [onDownloadGltf, onRequestClose])
 
   return (
     <div
-      ref={menuRef}
-      style={{
-        position: "fixed",
-        top: menuPos.y,
-        left: menuPos.x,
-        background: "#23272f",
-        color: "#f5f6fa",
-        borderRadius: 6,
-        boxShadow: "0 6px 24px 0 rgba(0,0,0,0.18)",
-        zIndex: 1000,
-        minWidth: 200,
-        border: "1px solid #353945",
-        padding: 0,
-        fontSize: 15,
-        fontWeight: 500,
-        transition: "opacity 0.1s",
-      }}
-    >
-      <div
-        style={{
-          padding: "12px 18px",
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-          color: "#f5f6fa",
-          fontWeight: 500,
-          borderRadius: 6,
-          transition: "background 0.1s",
-        }}
-        onClick={() =>
-          onEngineSwitch(engine === "jscad" ? "manifold" : "jscad")
+      ref={(node) => {
+        if (menuRef) {
+          menuRef.current = node
         }
-        onMouseOver={(event) => handleMenuItemHover(event, true)}
-        onMouseOut={(event) => handleMenuItemHover(event, false)}
+        if (node) {
+          updateMenuPosition()
+        }
+      }}
+      className="viewer-context-menu"
+      style={{
+        ...menuStyle,
+        opacity: isMenuPositioned ? 1 : 0,
+        pointerEvents: isMenuPositioned ? "auto" : "none",
+      }}
+      role="menu"
+    >
+      <button
+        type="button"
+        className="viewer-context-menu__item"
+        onClick={handleEngineSwitch}
       >
-        Switch to {engine === "jscad" ? "Manifold" : "JSCAD"} Engine
-        <span
-          style={{
-            fontSize: 12,
-            marginLeft: "auto",
-            opacity: 0.5,
-            fontWeight: 400,
-          }}
-        >
+        <span>Switch to {engine === "jscad" ? "Manifold" : "JSCAD"} Engine</span>
+        <span className="viewer-context-menu__meta">
           {engine === "jscad" ? "experimental" : "default"}
         </span>
-      </div>
+      </button>
+
       <div
-        style={{ position: "relative" }}
-        onMouseEnter={() => setActiveSubmenu("camera")}
-        onMouseLeave={() => setActiveSubmenu(null)}
+        className="viewer-context-menu__submenu"
+        onMouseEnter={() => setCameraOpen(true)}
+        onMouseLeave={() => setCameraOpen(false)}
       >
-        <div
-          style={{
-            padding: "10px 18px",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            color: "#f5f6fa",
-            fontWeight: 500,
-            borderRadius: 6,
-            transition: "background 0.1s",
-            background: activeSubmenu === "camera" ? "#2d313a" : "transparent",
-          }}
-          onClick={() =>
-            setActiveSubmenu((current) =>
-              current === "camera" ? null : "camera",
-            )
-          }
+        <button
+          type="button"
+          className="viewer-context-menu__item viewer-context-menu__item--submenu"
+          ref={cameraTriggerRef}
+          onClick={() => setCameraOpen((prev) => !prev)}
         >
-          Camera Position
-          <span style={{ marginLeft: "auto", opacity: 0.75 }}>
-            {cameraPreset}
-          </span>
-          <span style={{ marginLeft: 4, opacity: 0.5 }}>›</span>
-        </div>
-        {activeSubmenu === "camera" && (
+          <span>Camera Position</span>
+          <span className="viewer-context-menu__meta">{cameraPreset}</span>
+          <span className="viewer-context-menu__submenu-arrow">›</span>
+        </button>
+        {cameraOpen && (
           <div
+            ref={cameraMenuRef}
+            className="viewer-context-menu viewer-context-menu--submenu"
             style={{
-              position: "absolute",
-              top: 0,
-              left: "100%",
-              marginLeft: -2,
-              background: "#23272f",
-              color: "#f5f6fa",
-              borderRadius: 6,
-              boxShadow: "0 6px 24px 0 rgba(0,0,0,0.18)",
-              border: "1px solid #353945",
-              minWidth: 200,
-              padding: "6px 0",
-              zIndex: 1001,
+              ...cameraMenuStyle,
+              opacity: isCameraPositioned ? 1 : 0,
+              pointerEvents: isCameraPositioned ? "auto" : "none",
             }}
+            role="menu"
           >
-            {cameraOptions.map((option) => (
-              <div
-                key={option}
-                style={{
-                  padding: "10px 18px",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  color: "#f5f6fa",
-                  fontWeight: 500,
-                  borderRadius: 6,
-                  transition: "background 0.1s",
-                }}
-                onClick={() => onCameraPresetSelect(option)}
-                onMouseOver={(event) => handleMenuItemHover(event, true)}
-                onMouseOut={(event) => handleMenuItemHover(event, false)}
-              >
-                <span style={{ width: 18 }}>
-                  {cameraPreset === option ? "✔" : ""}
-                </span>
-                {option}
-              </div>
-            ))}
+            {cameraOptions.map((option) => {
+              const selected = cameraPreset === option
+              return (
+                <button
+                  key={option}
+                  type="button"
+                  className={`viewer-context-menu__item viewer-context-menu__item--radio${selected ? " is-selected" : ""}`}
+                  onClick={() => handleCameraPresetSelect(option)}
+                >
+                  <span className="viewer-context-menu__indicator">
+                    {selected ? "•" : ""}
+                  </span>
+                  {option}
+                </button>
+              )
+            })}
           </div>
         )}
       </div>
-      <div
-        style={{
-          padding: "12px 18px",
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-          color: "#f5f6fa",
-          fontWeight: 500,
-          borderRadius: 6,
-          transition: "background 0.1s",
-        }}
-        onClick={onAutoRotateToggle}
-        onMouseOver={(event) => handleMenuItemHover(event, true)}
-        onMouseOut={(event) => handleMenuItemHover(event, false)}
+
+      <button
+        type="button"
+        className={`viewer-context-menu__item viewer-context-menu__item--checkbox${autoRotate ? " is-selected" : ""}`}
+        onClick={handleAutoRotateToggle}
       >
-        <span style={{ marginRight: 8 }}>{autoRotate ? "✔" : ""}</span>
+        <span className="viewer-context-menu__indicator">
+          {autoRotate ? "✔" : ""}
+        </span>
         Auto rotate
-      </div>
-      <div
-        style={{
-          padding: "12px 18px",
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-          color: "#f5f6fa",
-          fontWeight: 500,
-          borderRadius: 6,
-          transition: "background 0.1s",
-        }}
-        onClick={onDownloadGltf}
-        onMouseOver={(event) => handleMenuItemHover(event, true)}
-        onMouseOut={(event) => handleMenuItemHover(event, false)}
+      </button>
+
+      <button
+        type="button"
+        className="viewer-context-menu__item"
+        onClick={handleDownload}
       >
         Download GLTF
-      </div>
+      </button>
+
+      <div className="viewer-context-menu__separator" role="separator" />
       <AppearanceMenu />
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          padding: "8px 0",
-          borderTop: "1px solid rgba(255, 255, 255, 0.1)",
-          marginTop: "8px",
-        }}
-      >
-        <span
-          style={{
-            fontSize: 10,
-            opacity: 0.6,
-            fontWeight: 300,
-            color: "#c0c0c0",
-          }}
-        >
-          @tscircuit/3d-viewer@{packageJson.version}
-        </span>
+
+      <div className="viewer-context-menu__separator" role="separator" />
+      <div className="viewer-context-menu__label">
+        @tscircuit/3d-viewer@{packageJson.version}
       </div>
     </div>
   )
