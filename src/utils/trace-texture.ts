@@ -8,6 +8,7 @@ import type {
   PcbPlatedHole,
 } from "circuit-json"
 import { su } from "@tscircuit/circuit-json-util"
+import { boardCenterFromAnchor, boardDimensionsFromBoard } from "./board-anchor"
 
 export function isWireRoutePoint(
   point: any,
@@ -44,9 +45,14 @@ export function createTraceTextureForLayer({
   )
   if (tracesOnLayer.length === 0) return null
 
+  const { width, height } = boardDimensionsFromBoard(boardData)
+  if (width <= 0 || height <= 0) return null
+
+  const boardCenter = boardCenterFromAnchor(boardData)
+
   const canvas = document.createElement("canvas")
-  const canvasWidth = Math.floor(boardData.width * traceTextureResolution)
-  const canvasHeight = Math.floor(boardData.height * traceTextureResolution)
+  const canvasWidth = Math.floor(width * traceTextureResolution)
+  const canvasHeight = Math.floor(height * traceTextureResolution)
   canvas.width = canvasWidth
   canvas.height = canvasHeight
   const ctx = canvas.getContext("2d")
@@ -75,11 +81,9 @@ export function createTraceTextureForLayer({
       currentLineWidth = point.width * traceTextureResolution
       ctx.lineWidth = currentLineWidth
       const canvasX =
-        (pcbX - boardData.center.x + boardData.width / 2) *
-        traceTextureResolution
+        (pcbX - boardCenter.x + width / 2) * traceTextureResolution
       const canvasY =
-        (-(pcbY - boardData.center.y) + boardData.height / 2) *
-        traceTextureResolution
+        (-(pcbY - boardCenter.y) + height / 2) * traceTextureResolution
       if (firstPoint) {
         ctx.moveTo(canvasX, canvasY)
         firstPoint = false
@@ -96,11 +100,9 @@ export function createTraceTextureForLayer({
   ctx.fillStyle = "black"
   allPcbVias.forEach((via) => {
     const canvasX =
-      (via.x - boardData.center.x + boardData.width / 2) *
-      traceTextureResolution
+      (via.x - boardCenter.x + width / 2) * traceTextureResolution
     const canvasY =
-      (-(via.y - boardData.center.y) + boardData.height / 2) *
-      traceTextureResolution
+      (-(via.y - boardCenter.y) + height / 2) * traceTextureResolution
     const canvasRadius = (via.outer_diameter / 2) * traceTextureResolution
     ctx.beginPath()
     ctx.arc(canvasX, canvasY, canvasRadius, 0, 2 * Math.PI, false)
@@ -109,11 +111,9 @@ export function createTraceTextureForLayer({
   allPcbPlatedHoles.forEach((ph) => {
     if (ph.layers.includes(layer) && ph.shape === "circle") {
       const canvasX =
-        (ph.x - boardData.center.x + boardData.width / 2) *
-        traceTextureResolution
+        (ph.x - boardCenter.x + width / 2) * traceTextureResolution
       const canvasY =
-        (-(ph.y - boardData.center.y) + boardData.height / 2) *
-        traceTextureResolution
+        (-(ph.y - boardCenter.y) + height / 2) * traceTextureResolution
       const canvasRadius = (ph.outer_diameter / 2) * traceTextureResolution
       ctx.beginPath()
       ctx.arc(canvasX, canvasY, canvasRadius, 0, 2 * Math.PI, false)

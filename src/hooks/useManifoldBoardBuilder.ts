@@ -33,6 +33,7 @@ import { processSmtPadsForManifold } from "../utils/manifold/process-smt-pads"
 import { createManifoldBoard } from "../utils/manifold/create-manifold-board"
 import { processCopperPoursForManifold } from "../utils/manifold/process-copper-pours"
 import { processCutoutsForManifold } from "../utils/manifold/process-cutouts"
+import { boardCenterFromAnchor } from "../utils/board-anchor"
 
 export interface ManifoldGeoms {
   board?: {
@@ -182,11 +183,8 @@ export const useManifoldBoardBuilder = (
           true,
         )
         manifoldInstancesForCleanup.current.push(clipCube)
-        const translatedClipCube = clipCube.translate([
-          boardData.center.x,
-          boardData.center.y,
-          0,
-        ])
+        const { x: centerX, y: centerY } = boardCenterFromAnchor(boardData)
+        const translatedClipCube = clipCube.translate([centerX, centerY, 0])
         manifoldInstancesForCleanup.current.push(translatedClipCube)
         boardClipVolume = translatedClipCube
       }

@@ -1,6 +1,10 @@
 import * as THREE from "three"
 import type { PcbBoard } from "circuit-json"
 import type { ManifoldTextures } from "../../hooks/useManifoldBoardBuilder"
+import {
+  boardCenterFromAnchor,
+  boardDimensionsFromBoard,
+} from "../board-anchor"
 
 export function createTextureMeshes(
   textures: ManifoldTextures | null,
@@ -10,6 +14,9 @@ export function createTextureMeshes(
   const meshes: THREE.Mesh[] = []
   if (!textures || !boardData || pcbThickness === null) return meshes
 
+  const { width, height } = boardDimensionsFromBoard(boardData)
+  const { x: centerX, y: centerY } = boardCenterFromAnchor(boardData)
+
   const createTexturePlane = (
     texture: THREE.CanvasTexture | null | undefined,
     yOffset: number,
@@ -17,7 +24,7 @@ export function createTextureMeshes(
     keySuffix: string,
   ) => {
     if (!texture) return null
-    const planeGeom = new THREE.PlaneGeometry(boardData.width, boardData.height)
+    const planeGeom = new THREE.PlaneGeometry(width, height)
     const material = new THREE.MeshBasicMaterial({
       map: texture,
       transparent: true,
@@ -25,7 +32,7 @@ export function createTextureMeshes(
       depthWrite: false, // Important for layers to avoid z-fighting issues with board itself
     })
     const mesh = new THREE.Mesh(planeGeom, material)
-    mesh.position.set(boardData.center.x, boardData.center.y, yOffset)
+    mesh.position.set(centerX, centerY, yOffset)
     if (isBottomLayer) {
       mesh.rotation.set(Math.PI, 0, 0) // Flip for bottom layer
     }
