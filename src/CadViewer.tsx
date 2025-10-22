@@ -4,10 +4,7 @@ import { CadViewerJscad } from "./CadViewerJscad"
 import CadViewerManifold from "./CadViewerManifold"
 import { useContextMenu } from "./hooks/useContextMenu"
 import { useGlobalDownloadGltf } from "./hooks/useGlobalDownloadGltf"
-import {
-  LayerVisibilityProvider,
-  useLayerVisibility,
-} from "./contexts/LayerVisibilityContext"
+import { LayerVisibilityProvider } from "./contexts/LayerVisibilityContext"
 import { ContextMenu } from "./components/ContextMenu"
 import type {
   CameraController,
@@ -20,7 +17,6 @@ const CadViewerInner = (props: any) => {
   const [autoRotate, setAutoRotate] = useState(true)
   const [autoRotateUserToggled, setAutoRotateUserToggled] = useState(false)
   const [cameraPreset, setCameraPreset] = useState<CameraPreset>("Custom")
-  const { visibility, toggleLayer } = useLayerVisibility()
 
   const cameraControllerRef = useRef<CameraController | null>(null)
   const externalCameraControllerReady = props.onCameraControllerReady as
@@ -67,15 +63,11 @@ const CadViewerInner = (props: any) => {
     [cameraPreset, externalCameraControllerReady],
   )
 
-  const handleCameraPresetSelect = useCallback(
-    (preset: CameraPreset) => {
-      setCameraPreset(preset)
-      closeMenu()
-      if (preset === "Custom") return
-      cameraControllerRef.current?.animateToPreset(preset)
-    },
-    [closeMenu],
-  )
+  const handleCameraPresetSelect = useCallback((preset: CameraPreset) => {
+    setCameraPreset(preset)
+    if (preset === "Custom") return
+    cameraControllerRef.current?.animateToPreset(preset)
+  }, [])
 
   useEffect(() => {
     const stored = window.localStorage.getItem("cadViewerEngine")
@@ -148,17 +140,11 @@ const CadViewerInner = (props: any) => {
           autoRotate={autoRotate}
           onEngineSwitch={(newEngine) => {
             setEngine(newEngine)
-            closeMenu()
           }}
           onCameraPresetSelect={handleCameraPresetSelect}
-          onAutoRotateToggle={() => {
-            toggleAutoRotate()
-            closeMenu()
-          }}
-          onDownloadGltf={() => {
-            downloadGltf()
-            closeMenu()
-          }}
+          onAutoRotateToggle={toggleAutoRotate}
+          onDownloadGltf={downloadGltf}
+          onRequestClose={closeMenu}
         />
       )}
     </div>
