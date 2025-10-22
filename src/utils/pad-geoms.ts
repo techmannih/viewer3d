@@ -3,6 +3,7 @@ import {
   clampRectBorderRadius,
   extractRectBorderRadius,
 } from "./rect-border-radius"
+import { getPadRotationDegrees } from "./get-pad-rotation"
 
 const RECT_PAD_SEGMENTS = 64
 
@@ -87,7 +88,7 @@ export function createPadManifoldOp({
       borderRadius: rectBorderRadius,
     })
 
-    const rotation = pad.ccw_rotation ?? 0
+    const rotation = getPadRotationDegrees(pad)
     if (rotation) {
       padOp = padOp.rotate([0, 0, rotation])
     }

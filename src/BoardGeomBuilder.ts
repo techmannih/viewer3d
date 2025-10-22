@@ -50,6 +50,7 @@ import {
   clampRectBorderRadius,
   extractRectBorderRadius,
 } from "./utils/rect-border-radius"
+import { getPadRotationRadians } from "./utils/get-pad-rotation"
 
 const PAD_ROUNDED_SEGMENTS = 64
 const BOARD_CLIP_Z_MARGIN = 1
@@ -680,8 +681,10 @@ export class BoardGeomBuilder {
         M,
         rectBorderRadius,
       )
-      const rotationRadians = (pad.ccw_rotation * Math.PI) / 180
-      basePadGeom = rotateZ(rotationRadians, basePadGeom)
+      const rotationRadians = getPadRotationRadians(pad)
+      if (rotationRadians !== 0) {
+        basePadGeom = rotateZ(rotationRadians, basePadGeom)
+      }
       // Translate to final position
       const positionedPadGeom = translate([pad.x, pad.y, zPos], basePadGeom)
       let finalPadGeom: Geom3 = positionedPadGeom
