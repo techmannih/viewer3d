@@ -30,7 +30,6 @@ const CadViewerInner = (props: any) => {
   const {
     menuVisible,
     menuPos,
-    menuRef,
     contextMenuEventHandlers,
     setMenuVisible,
   } = useContextMenu({ containerRef })
@@ -139,28 +138,27 @@ const CadViewerInner = (props: any) => {
       >
         Engine: <b>{engine === "jscad" ? "JSCAD" : "Manifold"}</b>
       </div>
-      {menuVisible && (
-        <ContextMenu
-          menuRef={menuRef}
-          menuPos={menuPos}
-          engine={engine}
-          cameraPreset={cameraPreset}
-          autoRotate={autoRotate}
-          onEngineSwitch={(newEngine) => {
-            setEngine(newEngine)
-            closeMenu()
-          }}
-          onCameraPresetSelect={handleCameraPresetSelect}
-          onAutoRotateToggle={() => {
-            toggleAutoRotate()
-            closeMenu()
-          }}
-          onDownloadGltf={() => {
-            downloadGltf()
-            closeMenu()
-          }}
-        />
-      )}
+      <ContextMenu
+        open={menuVisible}
+        menuPos={menuPos}
+        onOpenChange={setMenuVisible}
+        engine={engine}
+        cameraPreset={cameraPreset}
+        autoRotate={autoRotate}
+        onEngineSwitch={(newEngine) => {
+          setEngine(newEngine)
+          closeMenu()
+        }}
+        onCameraPresetSelect={handleCameraPresetSelect}
+        onAutoRotateToggle={() => {
+          toggleAutoRotate()
+          closeMenu()
+        }}
+        onDownloadGltf={() => {
+          downloadGltf()
+          closeMenu()
+        }}
+      />
     </div>
   )
 }

@@ -4,6 +4,7 @@
     "": {
       "name": "@tscircuit/3d-viewer",
       "dependencies": {
+        "@radix-ui/react-dropdown-menu": "^2.1.6",
         "@jscad/regl-renderer": "^2.6.12",
         "@jscad/stl-serializer": "^2.1.20",
         "three": "^0.165.0",

@@ -1,161 +1,159 @@
-import { useState } from "react"
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu"
 import { useLayerVisibility } from "../contexts/LayerVisibilityContext"
 import type React from "react"
 
-const menuItemStyle: React.CSSProperties = {
-  padding: "8px 18px",
-  cursor: "pointer",
+const subTriggerStyle: React.CSSProperties = {
+  borderRadius: 6,
+  padding: "8px 12px",
   display: "flex",
   alignItems: "center",
-  gap: 10,
-  color: "#f5f6fa",
-  fontWeight: 400,
+  gap: 8,
+  cursor: "pointer",
+  outline: "none",
+}
+
+const subContentStyle: React.CSSProperties = {
+  minWidth: 200,
+  backgroundColor: "#fff",
+  color: "#1f2933",
+  borderRadius: 8,
+  padding: 6,
+  boxShadow:
+    "0px 10px 38px -10px rgba(22, 23, 24, 0.35), 0px 10px 20px -15px rgba(22, 23, 24, 0.2)",
   fontSize: 14,
-  transition: "background 0.1s",
+  fontWeight: 500,
 }
 
-const checkmarkStyle: React.CSSProperties = {
-  width: 20,
+const checkboxItemStyle: React.CSSProperties = {
+  borderRadius: 6,
+  padding: "8px 12px",
+  display: "flex",
+  alignItems: "center",
+  gap: 12,
+  cursor: "pointer",
+  outline: "none",
+  position: "relative",
+  paddingLeft: 32,
 }
 
-const handleMouseOver = (e: React.MouseEvent<HTMLDivElement>) => {
-  e.currentTarget.style.background = "#2d313a"
+const chevronStyle: React.CSSProperties = {
+  marginLeft: "auto",
+  fontSize: 12,
+  opacity: 0.6,
 }
 
-const handleMouseOut = (e: React.MouseEvent<HTMLDivElement>) => {
-  e.currentTarget.style.background = "transparent"
+const indicatorStyle: React.CSSProperties = {
+  position: "absolute",
+  left: 12,
+  width: 12,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+}
+
+const highlightHandlers: Pick<
+  React.HTMLAttributes<HTMLElement>,
+  "onPointerMove" | "onPointerLeave" | "onFocus" | "onBlur"
+> = {
+  onPointerMove: (event) => {
+    event.currentTarget.style.backgroundColor = "#eef2f6"
+  },
+  onPointerLeave: (event) => {
+    event.currentTarget.style.backgroundColor = "transparent"
+  },
+  onFocus: (event) => {
+    event.currentTarget.style.backgroundColor = "#eef2f6"
+  },
+  onBlur: (event) => {
+    event.currentTarget.style.backgroundColor = "transparent"
+  },
 }
 
 export const AppearanceMenu = () => {
   const { visibility, toggleLayer } = useLayerVisibility()
-  const [showSubmenu, setShowSubmenu] = useState(false)
 
   return (
-    <>
-      <div
-        style={{
-          borderTop: "1px solid rgba(255, 255, 255, 0.1)",
-          margin: "8px 0",
-        }}
-      />
-      <div
-        style={{
-          padding: "8px 18px",
-          fontSize: 14,
-          color: "#f5f6fa",
-          fontWeight: 400,
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          transition: "background 0.1s",
-          position: "relative",
-        }}
-        onMouseEnter={() => setShowSubmenu(true)}
-        onMouseLeave={() => setShowSubmenu(false)}
-        onMouseOver={handleMouseOver}
-        onMouseOut={handleMouseOut}
-      >
-        <span>Appearance</span>
-        <span
-          style={{
-            fontSize: 10,
-            transform: showSubmenu ? "rotate(90deg)" : "rotate(0deg)",
-            transition: "transform 0.2s",
-            display: "inline-block",
-          }}
+    <DropdownMenu.Sub>
+      <DropdownMenu.SubTrigger style={subTriggerStyle} {...highlightHandlers}>
+        Appearance
+        <span style={chevronStyle}>›</span>
+      </DropdownMenu.SubTrigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.SubContent
+          sideOffset={8}
+          side="right"
+          align="start"
+          collisionPadding={8}
+          style={subContentStyle}
         >
-          ▶
-        </span>
-
-        {showSubmenu && (
-          <div
-            style={{
-              position: "absolute",
-              left: "100%",
-              top: 0,
-              minWidth: 200,
-              background: "#23272f",
-              border: "1px solid rgba(255, 255, 255, 0.1)",
-              borderRadius: 6,
-              boxShadow: "0 4px 12px rgba(0, 0, 0, 0.4)",
-              zIndex: 1000,
-              marginTop: 8,
-              marginBottom: 8,
-            }}
-            onMouseEnter={() => setShowSubmenu(true)}
-            onMouseLeave={() => setShowSubmenu(false)}
-            onClick={(e) => e.stopPropagation()}
+          <DropdownMenu.CheckboxItem
+            checked={visibility.boardBody}
+            onCheckedChange={() => toggleLayer("boardBody")}
+            style={checkboxItemStyle}
+            {...highlightHandlers}
           >
-            <div
-              style={menuItemStyle}
-              onClick={() => toggleLayer("boardBody")}
-              onMouseOver={handleMouseOver}
-              onMouseOut={handleMouseOut}
-            >
-              <span style={checkmarkStyle}>
-                {visibility.boardBody ? "✔" : ""}
-              </span>
-              Board Body
-            </div>
-            <div
-              style={menuItemStyle}
-              onClick={() => toggleLayer("topCopper")}
-              onMouseOver={handleMouseOver}
-              onMouseOut={handleMouseOut}
-            >
-              <span style={checkmarkStyle}>
-                {visibility.topCopper ? "✔" : ""}
-              </span>
-              Top Copper
-            </div>
-            <div
-              style={menuItemStyle}
-              onClick={() => toggleLayer("bottomCopper")}
-              onMouseOver={handleMouseOver}
-              onMouseOut={handleMouseOut}
-            >
-              <span style={checkmarkStyle}>
-                {visibility.bottomCopper ? "✔" : ""}
-              </span>
-              Bottom Copper
-            </div>
-            <div
-              style={menuItemStyle}
-              onClick={() => toggleLayer("topSilkscreen")}
-              onMouseOver={handleMouseOver}
-              onMouseOut={handleMouseOut}
-            >
-              <span style={checkmarkStyle}>
-                {visibility.topSilkscreen ? "✔" : ""}
-              </span>
-              Top Silkscreen
-            </div>
-            <div
-              style={menuItemStyle}
-              onClick={() => toggleLayer("bottomSilkscreen")}
-              onMouseOver={handleMouseOver}
-              onMouseOut={handleMouseOut}
-            >
-              <span style={checkmarkStyle}>
-                {visibility.bottomSilkscreen ? "✔" : ""}
-              </span>
-              Bottom Silkscreen
-            </div>
-            <div
-              style={menuItemStyle}
-              onClick={() => toggleLayer("smtModels")}
-              onMouseOver={handleMouseOver}
-              onMouseOut={handleMouseOut}
-            >
-              <span style={checkmarkStyle}>
-                {visibility.smtModels ? "✔" : ""}
-              </span>
-              CAD Models
-            </div>
-          </div>
-        )}
-      </div>
-    </>
+            <DropdownMenu.ItemIndicator style={indicatorStyle}>
+              ✔
+            </DropdownMenu.ItemIndicator>
+            Board Body
+          </DropdownMenu.CheckboxItem>
+          <DropdownMenu.CheckboxItem
+            checked={visibility.topCopper}
+            onCheckedChange={() => toggleLayer("topCopper")}
+            style={checkboxItemStyle}
+            {...highlightHandlers}
+          >
+            <DropdownMenu.ItemIndicator style={indicatorStyle}>
+              ✔
+            </DropdownMenu.ItemIndicator>
+            Top Copper
+          </DropdownMenu.CheckboxItem>
+          <DropdownMenu.CheckboxItem
+            checked={visibility.bottomCopper}
+            onCheckedChange={() => toggleLayer("bottomCopper")}
+            style={checkboxItemStyle}
+            {...highlightHandlers}
+          >
+            <DropdownMenu.ItemIndicator style={indicatorStyle}>
+              ✔
+            </DropdownMenu.ItemIndicator>
+            Bottom Copper
+          </DropdownMenu.CheckboxItem>
+          <DropdownMenu.CheckboxItem
+            checked={visibility.topSilkscreen}
+            onCheckedChange={() => toggleLayer("topSilkscreen")}
+            style={checkboxItemStyle}
+            {...highlightHandlers}
+          >
+            <DropdownMenu.ItemIndicator style={indicatorStyle}>
+              ✔
+            </DropdownMenu.ItemIndicator>
+            Top Silkscreen
+          </DropdownMenu.CheckboxItem>
+          <DropdownMenu.CheckboxItem
+            checked={visibility.bottomSilkscreen}
+            onCheckedChange={() => toggleLayer("bottomSilkscreen")}
+            style={checkboxItemStyle}
+            {...highlightHandlers}
+          >
+            <DropdownMenu.ItemIndicator style={indicatorStyle}>
+              ✔
+            </DropdownMenu.ItemIndicator>
+            Bottom Silkscreen
+          </DropdownMenu.CheckboxItem>
+          <DropdownMenu.CheckboxItem
+            checked={visibility.smtModels}
+            onCheckedChange={() => toggleLayer("smtModels")}
+            style={checkboxItemStyle}
+            {...highlightHandlers}
+          >
+            <DropdownMenu.ItemIndicator style={indicatorStyle}>
+              ✔
+            </DropdownMenu.ItemIndicator>
+            CAD Models
+          </DropdownMenu.CheckboxItem>
+        </DropdownMenu.SubContent>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Sub>
   )
 }
