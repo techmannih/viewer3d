@@ -1,4 +1,5 @@
-import { useState, useCallback, useRef, useEffect } from "react"
+import { useState, useCallback, useRef } from "react"
+import type React from "react"
 
 interface ContextMenuProps {
   containerRef: React.RefObject<HTMLDivElement | null>
@@ -10,7 +11,6 @@ export const useContextMenu = ({ containerRef }: ContextMenuProps) => {
     x: 0,
     y: 0,
   })
-  const menuRef = useRef<HTMLDivElement>(null)
   const interactionOriginPosRef = useRef<{ x: number; y: number } | null>(null)
   const longPressTimeoutRef = useRef<number | null>(null)
   const ignoreNextContextMenuRef = useRef(false)
@@ -123,25 +123,6 @@ export const useContextMenu = ({ containerRef }: ContextMenuProps) => {
     }, 0)
   }, [])
 
-  const handleClickAway = useCallback((e: MouseEvent | TouchEvent) => {
-    const target = e.target as Node
-    // If the menu is visible and the click is outside the menu, hide it.
-    if (menuRef.current && !menuRef.current.contains(target)) {
-      setMenuVisible(false)
-    }
-  }, []) // setMenuVisible is stable, menuRef is a ref
-
-  useEffect(() => {
-    if (menuVisible) {
-      document.addEventListener("mousedown", handleClickAway)
-      document.addEventListener("touchstart", handleClickAway)
-      return () => {
-        document.removeEventListener("mousedown", handleClickAway)
-        document.removeEventListener("touchstart", handleClickAway)
-      }
-    }
-  }, [menuVisible, handleClickAway])
-
   const contextMenuEventHandlers = {
     onMouseDown: (e: React.MouseEvent) => {
       if (e.button === 2) {
@@ -160,7 +141,6 @@ export const useContextMenu = ({ containerRef }: ContextMenuProps) => {
   return {
     menuVisible,
     menuPos,
-    menuRef,
     contextMenuEventHandlers,
     setMenuVisible, // Expose setMenuVisible for direct control if needed
   }
