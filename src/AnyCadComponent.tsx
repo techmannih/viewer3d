@@ -162,6 +162,7 @@ export const AnyCadComponent = ({
             WebkitUserSelect: "none",
             MozUserSelect: "none",
             msUserSelect: "none",
+            zIndex: 1000,
           }}
         >
           {componentName ?? "<unknown>"}
