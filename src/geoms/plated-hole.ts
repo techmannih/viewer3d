@@ -14,7 +14,7 @@ import {
 import { BOARD_SURFACE_OFFSET, M, colors } from "./constants"
 import type { GeomContext } from "../GeomContext"
 import { extrudeLinear } from "@jscad/modeling/src/operations/extrusions"
-import { translate } from "@jscad/modeling/src/operations/transforms"
+import { rotateZ, translate } from "@jscad/modeling/src/operations/transforms"
 import {
   clampRectBorderRadius,
   extractRectBorderRadius,
@@ -57,6 +57,18 @@ const createRectPadGeom = ({
 
 type PlatedHoleOptions = {
   clipGeom?: Geom3 | null
+}
+
+const rotateGeomAroundCenter = (
+  geom: Geom3,
+  rotationRadians: number,
+  center: [number, number, number],
+) => {
+  if (Math.abs(rotationRadians) < 1e-9) return geom
+  const [cx, cy, cz] = center
+  const translatedToOrigin = translate([-cx, -cy, -cz], geom)
+  const rotated = rotateZ(rotationRadians, translatedToOrigin)
+  return translate([cx, cy, cz], rotated)
 }
 
 export const platedHole = (
@@ -187,7 +199,11 @@ export const platedHole = (
     return colorize(colors.copper, subtract(finalCopper, drill))
   }
 
-  if (plated_hole.shape === "pill") {
+  if (
+    plated_hole.shape === "pill" ||
+    plated_hole.shape === "rotated_pill"
+  ) {
+    const hasManualRotation = Math.abs(plated_hole.ccw_rotation || 0) > 1e-6
     const shouldRotate = plated_hole.hole_height! > plated_hole.hole_width!
 
     const holeWidth = shouldRotate
@@ -251,7 +267,7 @@ export const platedHole = (
       return union(rect, leftCap, rightCap)
     }
 
-    const outerBarrel = createPillSection(
+    let outerBarrel = createPillSection(
       outerPillWidth,
       outerPillHeight,
       copperHeight,
@@ -277,7 +293,18 @@ export const platedHole = (
       radius: holeRadius - M,
       height: throughDrillHeight,
     })
-    const drillUnion = union(drillRect, drillLeftCap, drillRightCap)
+    let drillUnion = union(drillRect, drillLeftCap, drillRightCap)
+
+    if (hasManualRotation) {
+      const rotationRadians = ((plated_hole.ccw_rotation || 0) * Math.PI) / 180
+      const center: [number, number, number] = [
+        plated_hole.x,
+        plated_hole.y,
+        0,
+      ]
+      outerBarrel = rotateGeomAroundCenter(outerBarrel, rotationRadians, center)
+      drillUnion = rotateGeomAroundCenter(drillUnion, rotationRadians, center)
+    }
 
     const copperSolid = maybeClip(outerBarrel, clipGeom)
     const drill = drillUnion
