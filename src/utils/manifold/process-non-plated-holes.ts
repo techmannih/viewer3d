@@ -96,10 +96,14 @@ export function processNonPlatedHolesForManifold(
 
       let pillDrillOp = createPillOp(holeW, holeH, drillDepth)
 
-      // Apply rotation for rotated_pill shape
-      const rotatedOp = pillDrillOp.rotate([0, 0, hole.ccw_rotation])
-      manifoldInstancesForCleanup.push(rotatedOp)
-      pillDrillOp = rotatedOp
+      const rotationDegrees = hole.ccw_rotation ?? 0
+      // Manifold expects radians for rotation; circuit-json stores degrees.
+      if (rotationDegrees !== 0) {
+        const rotationRadians = (rotationDegrees * Math.PI) / 180
+        const rotatedOp = pillDrillOp.rotate([0, 0, rotationRadians])
+        manifoldInstancesForCleanup.push(rotatedOp)
+        pillDrillOp = rotatedOp
+      }
 
       const translatedPillDrill = pillDrillOp.translate([hole.x, hole.y, 0])
       manifoldInstancesForCleanup.push(translatedPillDrill)
