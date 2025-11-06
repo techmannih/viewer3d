@@ -604,7 +604,9 @@ export class BoardGeomBuilder {
     const copperInset = 0.02 // tiny offset for plated hole copper cut
 
     // @ts-expect-error TODO fix type PcbHole doesn't have hole_shape
-    if (hole.hole_shape === "round" || hole.hole_shape === "circle") {
+    const holeShape = hole.hole_shape ?? hole.shape
+
+    if (holeShape === "round" || holeShape === "circle") {
       const cyGeom = cylinder({
         center: [hole.x, hole.y, 0],
         radius: hole.hole_diameter / 2 + M,
@@ -628,57 +630,69 @@ export class BoardGeomBuilder {
       this.platedHoleGeoms = this.platedHoleGeoms.map((phg) =>
         colorize(colors.copper, subtract(phg, copperCut)),
       )
-    } else if (
-      hole.hole_shape === "pill" ||
-      hole.hole_shape === "rotated_pill"
-    ) {
+    } else if (holeShape === "pill" || holeShape === "rotated_pill") {
       const holeWidth = hole.hole_width
       const holeHeight = hole.hole_height
-      const holeRadius = Math.min(holeWidth, holeHeight) / 2
-      const rectLength = Math.abs(holeWidth - holeHeight)
-      const isRotated = hole.hole_shape === "rotated_pill"
+      const isRotated = holeShape === "rotated_pill"
 
-      let pillHole: Geom3
-      if (holeWidth > holeHeight) {
-        pillHole = union(
-          cuboid({
-            center: [hole.x, hole.y, 0],
-            size: [rectLength, holeHeight, holeDepth],
-          }),
-          cylinder({
-            center: [hole.x - rectLength / 2, hole.y, 0],
-            radius: holeRadius,
-            height: holeDepth,
-          }),
-          cylinder({
-            center: [hole.x + rectLength / 2, hole.y, 0],
-            radius: holeRadius,
-            height: holeDepth,
-          }),
-        )
-      } else {
-        pillHole = union(
-          cuboid({
-            center: [hole.x, hole.y, 0],
-            size: [holeWidth, rectLength, holeDepth],
-          }),
-          cylinder({
-            center: [hole.x, hole.y - rectLength / 2, 0],
-            radius: holeRadius,
-            height: holeDepth,
-          }),
-          cylinder({
-            center: [hole.x, hole.y + rectLength / 2, 0],
-            radius: holeRadius,
-            height: holeDepth,
-          }),
-        )
+      const createCenteredPillGeom = () => {
+        const shortSide = Math.min(holeWidth, holeHeight)
+        const longSide = Math.max(holeWidth, holeHeight)
+        const radius = shortSide / 2
+        const length = longSide - shortSide
+
+        if (length <= 0) {
+          return cylinder({ center: [0, 0, 0], radius, height: holeDepth })
+        }
+
+        const shapes: Geom3[] = []
+        if (holeWidth >= holeHeight) {
+          shapes.push(
+            cuboid({
+              center: [0, 0, 0],
+              size: [length, shortSide, holeDepth],
+            }),
+            cylinder({
+              center: [-length / 2, 0, 0],
+              radius,
+              height: holeDepth,
+            }),
+            cylinder({
+              center: [length / 2, 0, 0],
+              radius,
+              height: holeDepth,
+            }),
+          )
+        } else {
+          shapes.push(
+            cuboid({
+              center: [0, 0, 0],
+              size: [shortSide, length, holeDepth],
+            }),
+            cylinder({
+              center: [0, -length / 2, 0],
+              radius,
+              height: holeDepth,
+            }),
+            cylinder({
+              center: [0, length / 2, 0],
+              radius,
+              height: holeDepth,
+            }),
+          )
+        }
+
+        return union(shapes)
       }
 
-      if (isRotated) {
+      let pillHole = createCenteredPillGeom()
+
+      if (isRotated && hole.ccw_rotation) {
         const rotationRadians = (hole.ccw_rotation * Math.PI) / 180
         pillHole = rotateZ(rotationRadians, pillHole)
       }
+
+      pillHole = translate([hole.x, hole.y, 0], pillHole)
 
       this.boardGeom = subtract(this.boardGeom, pillHole)
       this.padGeoms = this.padGeoms.map((pg) =>
