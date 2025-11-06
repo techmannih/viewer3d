@@ -96,6 +96,8 @@ export const CadViewerContainer = forwardRef<
             left: 0,
             width: 120,
             height: 120,
+            pointerEvents: "none",
+            zIndex: 1,
           }}
         >
           <Canvas
@@ -103,7 +105,7 @@ export const CadViewerContainer = forwardRef<
               up: [0, 0, 1],
               position: [1, 1, 1],
             }}
-            style={{ zIndex: 10 }}
+            style={{ zIndex: 1, pointerEvents: "none" }}
           >
             <CubeWithLabeledSides />
           </Canvas>
@@ -148,6 +150,8 @@ export const CadViewerContainer = forwardRef<
             color: "white",
             WebkitTextStroke: "0.5px rgba(0, 0, 0, 0.5)",
             fontSize: 11,
+            pointerEvents: "none",
+            zIndex: 1,
           }}
         >
           @{packageJson.version}

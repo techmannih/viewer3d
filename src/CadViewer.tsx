@@ -152,6 +152,8 @@ const CadViewerInner = (props: any) => {
           fontSize: 12,
           opacity: 0.7,
           userSelect: "none",
+          pointerEvents: "none",
+          zIndex: 1,
         }}
       >
         Engine: <b>{engine === "jscad" ? "JSCAD" : "Manifold"}</b>
