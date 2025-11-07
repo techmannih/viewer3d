@@ -130,8 +130,12 @@ export function processPlatedHolesForManifold(
 
       let boardPillDrillOp = createPillOp(drillW, drillH, drillDepth)
 
-      if (ph.ccw_rotation) {
-        const rotatedOp = boardPillDrillOp.rotate([0, 0, ph.ccw_rotation])
+      const rotationDegrees = ph.ccw_rotation ?? 0
+      // Manifold expects radians for rotation; circuit-json stores degrees.
+      const rotationRadians = (rotationDegrees * Math.PI) / 180
+
+      if (rotationDegrees !== 0) {
+        const rotatedOp = boardPillDrillOp.rotate([0, 0, rotationRadians])
         manifoldInstancesForCleanup.push(rotatedOp)
         boardPillDrillOp = rotatedOp
       }
@@ -163,8 +167,8 @@ export function processPlatedHolesForManifold(
       )
       manifoldInstancesForCleanup.push(finalPlatedPartOp)
 
-      if (ph.ccw_rotation) {
-        const rotatedOp = finalPlatedPartOp.rotate([0, 0, ph.ccw_rotation])
+      if (rotationDegrees !== 0) {
+        const rotatedOp = finalPlatedPartOp.rotate([0, 0, rotationRadians])
         manifoldInstancesForCleanup.push(rotatedOp)
         finalPlatedPartOp = rotatedOp
       }
