@@ -732,6 +732,36 @@ export class BoardGeomBuilder {
       }
       finalPadGeom = colorize(colors.copper, finalPadGeom)
       this.padGeoms.push(finalPadGeom)
+    } else if (pad.shape === "polygon") {
+      const polygonPad = pad as PcbSmtPad & {
+        points?: Point[]
+      }
+
+      if (!polygonPad.points || polygonPad.points.length < 3) {
+        return
+      }
+
+      let polygonPoints = polygonPad.points.map(
+        (point) => [point.x, point.y] as [number, number],
+      )
+
+      if (arePointsClockwise(polygonPoints)) {
+        polygonPoints = polygonPoints.reverse()
+      }
+
+      let padGeom = extrudeLinear(
+        { height: M },
+        jscadPolygon({ points: polygonPoints }),
+      )
+
+      padGeom = translate([0, 0, zPos - M / 2], padGeom)
+
+      if (this.boardClipGeom) {
+        padGeom = intersect(this.boardClipGeom, padGeom)
+      }
+
+      padGeom = colorize(colors.copper, padGeom)
+      this.padGeoms.push(padGeom)
     } else if (pad.shape === "circle") {
       let padGeom = cylinder({
         center: [pad.x, pad.y, zPos],
