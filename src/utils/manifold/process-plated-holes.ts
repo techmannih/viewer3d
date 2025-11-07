@@ -115,9 +115,10 @@ export function processPlatedHolesForManifold(
         geometry: threeGeom,
         color: COPPER_COLOR,
       })
-    } else if (ph.shape === "pill") {
+    } else if (ph.shape === "pill" || ph.shape === "rotated_pill") {
       const holeW = ph.hole_width!
       const holeH = ph.hole_height!
+      const hasRotation = Math.abs(ph.ccw_rotation ?? 0) > 1e-6
 
       const defaultPadExtension = 0.4 // 0.2mm pad extension per side
       const outerW = ph.outer_width ?? holeW + defaultPadExtension
@@ -130,8 +131,8 @@ export function processPlatedHolesForManifold(
 
       let boardPillDrillOp = createPillOp(drillW, drillH, drillDepth)
 
-      if (ph.ccw_rotation) {
-        const rotatedOp = boardPillDrillOp.rotate([0, 0, ph.ccw_rotation])
+      if (hasRotation) {
+        const rotatedOp = boardPillDrillOp.rotate([0, 0, ph.ccw_rotation!])
         manifoldInstancesForCleanup.push(rotatedOp)
         boardPillDrillOp = rotatedOp
       }
@@ -163,8 +164,8 @@ export function processPlatedHolesForManifold(
       )
       manifoldInstancesForCleanup.push(finalPlatedPartOp)
 
-      if (ph.ccw_rotation) {
-        const rotatedOp = finalPlatedPartOp.rotate([0, 0, ph.ccw_rotation])
+      if (hasRotation) {
+        const rotatedOp = finalPlatedPartOp.rotate([0, 0, ph.ccw_rotation!])
         manifoldInstancesForCleanup.push(rotatedOp)
         finalPlatedPartOp = rotatedOp
       }

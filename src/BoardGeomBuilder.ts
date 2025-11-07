@@ -60,6 +60,18 @@ const PAD_ROUNDED_SEGMENTS = 64
 const BOARD_CLIP_Z_MARGIN = 1
 const BOARD_CLIP_XY_OUTSET = 0.05
 
+const rotateGeomAroundCenter = (
+  geom: Geom3,
+  rotationRadians: number,
+  center: [number, number, number],
+) => {
+  if (Math.abs(rotationRadians) < 1e-9) return geom
+  const [cx, cy, cz] = center
+  const movedToOrigin = translate([-cx, -cy, -cz], geom)
+  const rotated = rotateZ(rotationRadians, movedToOrigin)
+  return translate([cx, cy, cz], rotated)
+}
+
 const createCenteredRectPadGeom = (
   width: number,
   height: number,
@@ -505,7 +517,12 @@ export class BoardGeomBuilder {
         clipGeom: this.boardClipGeom,
       })
       this.platedHoleGeoms.push(platedHoleGeom)
-    } else if (ph.shape === "pill" || ph.shape === "pill_hole_with_rect_pad") {
+    } else if (
+      ph.shape === "pill" ||
+      ph.shape === "pill_hole_with_rect_pad" ||
+      ph.shape === "rotated_pill"
+    ) {
+      const hasManualRotation = Math.abs(ph.ccw_rotation || 0) > 1e-6
       const shouldRotate = ph.hole_height! > ph.hole_width!
       const holeWidth = shouldRotate ? ph.hole_height! : ph.hole_width!
       const holeHeight = shouldRotate ? ph.hole_width! : ph.hole_height!
@@ -581,6 +598,20 @@ export class BoardGeomBuilder {
           }),
         )
       }
+
+      if (hasManualRotation) {
+        const rotationRadians = ((ph.ccw_rotation || 0) * Math.PI) / 180
+        const rotationCenter: [number, number, number] =
+          ph.shape === "pill_hole_with_rect_pad"
+            ? [
+                ph.x + (ph.hole_offset_x || 0),
+                ph.y + (ph.hole_offset_y || 0),
+                0,
+              ]
+            : [ph.x, ph.y, 0]
+        pillHole = rotateGeomAroundCenter(pillHole, rotationRadians, rotationCenter)
+      }
+
       if (!opts.dontCutBoard) {
         this.boardGeom = subtract(this.boardGeom, pillHole)
       }
@@ -676,8 +707,9 @@ export class BoardGeomBuilder {
       }
 
       if (isRotated) {
-        const rotationRadians = (hole.ccw_rotation * Math.PI) / 180
-        pillHole = rotateZ(rotationRadians, pillHole)
+        const rotationRadians = ((hole.ccw_rotation || 0) * Math.PI) / 180
+        const center: [number, number, number] = [hole.x, hole.y, 0]
+        pillHole = rotateGeomAroundCenter(pillHole, rotationRadians, center)
       }
 
       this.boardGeom = subtract(this.boardGeom, pillHole)
