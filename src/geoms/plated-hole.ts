@@ -108,7 +108,10 @@ const createHoleBodyForPolygonPad = (
     holeShape === "pill" ||
     holeShape === "rotated_pill"
   ) {
-    const width = Math.max((hole.hole_width || hole.hole_diameter || 0) - inset * 2, M)
+    const width = Math.max(
+      (hole.hole_width || hole.hole_diameter || 0) - inset * 2,
+      M,
+    )
     const height = Math.max(
       (hole.hole_height || hole.hole_diameter || 0) - inset * 2,
       M,
@@ -289,10 +292,9 @@ export const platedHole = (
 
   if (plated_hole.shape === "hole_with_polygon_pad") {
     const polygonHole = plated_hole as PcbHoleWithPolygonPad
-    const outlinePoints: Vec2[] = (polygonHole.pad_outline || []).map((point) => [
-      point.x,
-      point.y,
-    ])
+    const outlinePoints: Vec2[] = (polygonHole.pad_outline || []).map(
+      (point) => [point.x, point.y],
+    )
 
     if (outlinePoints.length < 3) {
       console.warn(
@@ -312,7 +314,10 @@ export const platedHole = (
     const ccwPoints = ensureCounterClockwise(outlinePoints)
     const polygon2d = jscadPolygon({ points: ccwPoints })
     const padExtrusion = extrudeLinear({ height: copperSpan }, polygon2d)
-    const padSolid = translate([polygonHole.x, polygonHole.y, bottomSurfaceZ], padExtrusion)
+    const padSolid = translate(
+      [polygonHole.x, polygonHole.y, bottomSurfaceZ],
+      padExtrusion,
+    )
 
     const holeCut = createHoleBodyForPolygonPad(
       polygonHole,

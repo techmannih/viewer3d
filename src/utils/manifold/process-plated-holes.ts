@@ -460,7 +460,11 @@ export function processPlatedHolesForManifold(
         true,
       )
       manifoldInstancesForCleanup.push(padPrism)
-      const translatedPadPrism = padPrism.translate([polygonHole.x, polygonHole.y, 0])
+      const translatedPadPrism = padPrism.translate([
+        polygonHole.x,
+        polygonHole.y,
+        0,
+      ])
       manifoldInstancesForCleanup.push(translatedPadPrism)
 
       const translateToHole = (op: any) => {
@@ -470,7 +474,10 @@ export function processPlatedHolesForManifold(
       }
 
       const maybeRotatePill = (op: any) => {
-        if (holeShape === "rotated_pill" && typeof polygonHole.ccw_rotation === "number") {
+        if (
+          holeShape === "rotated_pill" &&
+          typeof polygonHole.ccw_rotation === "number"
+        ) {
           const rotated = op.rotate([0, 0, polygonHole.ccw_rotation])
           manifoldInstancesForCleanup.push(rotated)
           return rotated
@@ -535,7 +542,9 @@ export function processPlatedHolesForManifold(
         manifoldInstancesForCleanup.push(drillCut)
         holeCutOp = translateToHole(drillCut)
       } else if (
-        (holeShape === "oval" || holeShape === "pill" || holeShape === "rotated_pill") &&
+        (holeShape === "oval" ||
+          holeShape === "pill" ||
+          holeShape === "rotated_pill") &&
         typeof polygonHole.hole_width === "number" &&
         typeof polygonHole.hole_height === "number"
       ) {
@@ -571,7 +580,6 @@ export function processPlatedHolesForManifold(
         console.warn(
           `pcb_plated_hole ${polygonHole.pcb_plated_hole_id} has unsupported hole_shape`,
         )
-        continue
       }
 
       if (boardDrillOp) {
@@ -579,7 +587,7 @@ export function processPlatedHolesForManifold(
       }
 
       if (!barrelOuter || !barrelInner || !holeCutOp) {
-        continue
+        return
       }
 
       const barrelShell = barrelOuter.subtract(barrelInner)

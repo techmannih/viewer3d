@@ -815,7 +815,8 @@ export class BoardGeomBuilder {
     }
 
     if (
-      (holeShape === "oval" || holeShape === "pill" ||
+      (holeShape === "oval" ||
+        holeShape === "pill" ||
         holeShape === "rotated_pill") &&
       typeof hole.hole_width === "number" &&
       typeof hole.hole_height === "number"
@@ -823,7 +824,10 @@ export class BoardGeomBuilder {
       const width = Math.max(hole.hole_width - inset * 2, M)
       const height = Math.max(hole.hole_height - inset * 2, M)
       let pill = this.createPillHoleSolid({ center, width, height, depth })
-      if (holeShape === "rotated_pill" && typeof hole.ccw_rotation === "number") {
+      if (
+        holeShape === "rotated_pill" &&
+        typeof hole.ccw_rotation === "number"
+      ) {
         pill = rotateZ((hole.ccw_rotation * Math.PI) / 180, pill)
       }
       return pill
