@@ -58,6 +58,7 @@ import {
   clampRectBorderRadius,
   extractRectBorderRadius,
 } from "./utils/rect-border-radius"
+import type { PcbHoleWithPolygonPad } from "./types/pcb-hole-with-polygon-pad"
 
 const PAD_ROUNDED_SEGMENTS = 64
 const BOARD_CLIP_Z_MARGIN = 1
@@ -548,6 +549,25 @@ export class BoardGeomBuilder {
         clipGeom: this.boardClipGeom,
       })
       this.platedHoleGeoms.push(platedHoleGeom)
+    } else if (ph.shape === "hole_with_polygon_pad") {
+      const polygonHole = ph as PcbHoleWithPolygonPad
+      const holeGeom = this.createPolygonPadHoleCut(
+        polygonHole,
+        this.ctx.pcbThickness * 1.5,
+      )
+      if (!holeGeom) return
+
+      if (!opts.dontCutBoard) {
+        this.boardGeom = subtract(this.boardGeom, holeGeom)
+      }
+      this.padGeoms = this.padGeoms.map((pg) =>
+        colorize(colors.copper, subtract(pg, holeGeom)),
+      )
+
+      const platedHoleGeom = platedHole(polygonHole, this.ctx, {
+        clipGeom: this.boardClipGeom,
+      })
+      this.platedHoleGeoms.push(platedHoleGeom)
     } else if (ph.shape === "pill" || ph.shape === "pill_hole_with_rect_pad") {
       const shouldRotate = ph.hole_height! > ph.hole_width!
       const holeWidth = shouldRotate ? ph.hole_height! : ph.hole_width!
@@ -734,6 +754,85 @@ export class BoardGeomBuilder {
         colorize(colors.copper, subtract(phg, copperPill)),
       )
     }
+  }
+
+  private createPillHoleSolid({
+    center,
+    width,
+    height,
+    depth,
+  }: {
+    center: [number, number, number]
+    width: number
+    height: number
+    depth: number
+  }): Geom3 {
+    const holeRadius = Math.min(width, height) / 2
+    const rectLength = Math.abs(width - height)
+    const longAxisIsX = width >= height
+
+    const block = cuboid({
+      center,
+      size: longAxisIsX
+        ? [Math.max(rectLength, M), height, depth]
+        : [width, Math.max(rectLength, M), depth],
+    })
+
+    const firstCylinder = cylinder({
+      center: longAxisIsX
+        ? [center[0] - rectLength / 2, center[1], center[2]]
+        : [center[0], center[1] - rectLength / 2, center[2]],
+      radius: holeRadius,
+      height: depth,
+    })
+
+    const secondCylinder = cylinder({
+      center: longAxisIsX
+        ? [center[0] + rectLength / 2, center[1], center[2]]
+        : [center[0], center[1] + rectLength / 2, center[2]],
+      radius: holeRadius,
+      height: depth,
+    })
+
+    return union(block, firstCylinder, secondCylinder)
+  }
+
+  private createPolygonPadHoleCut(
+    hole: PcbHoleWithPolygonPad,
+    depth: number,
+    inset = 0,
+  ): Geom3 | null {
+    const holeShape = hole.hole_shape || "circle"
+    const center: [number, number, number] = [
+      hole.x + (hole.hole_offset_x || 0),
+      hole.y + (hole.hole_offset_y || 0),
+      0,
+    ]
+
+    if (holeShape === "circle" && typeof hole.hole_diameter === "number") {
+      const radius = Math.max(hole.hole_diameter / 2 - inset, M / 2)
+      return cylinder({ center, radius, height: depth })
+    }
+
+    if (
+      (holeShape === "oval" || holeShape === "pill" ||
+        holeShape === "rotated_pill") &&
+      typeof hole.hole_width === "number" &&
+      typeof hole.hole_height === "number"
+    ) {
+      const width = Math.max(hole.hole_width - inset * 2, M)
+      const height = Math.max(hole.hole_height - inset * 2, M)
+      let pill = this.createPillHoleSolid({ center, width, height, depth })
+      if (holeShape === "rotated_pill" && typeof hole.ccw_rotation === "number") {
+        pill = rotateZ((hole.ccw_rotation * Math.PI) / 180, pill)
+      }
+      return pill
+    }
+
+    console.warn(
+      `pcb_plated_hole ${hole.pcb_plated_hole_id} has unsupported hole geometry`,
+    )
+    return null
   }
 
   private processPad(pad: PcbSmtPad) {

@@ -14,6 +14,17 @@ import {
   BOARD_SURFACE_OFFSET,
 } from "../../geoms/constants"
 import { extractRectBorderRadius } from "../rect-border-radius"
+import type { PcbHoleWithPolygonPad } from "../../types/pcb-hole-with-polygon-pad"
+
+const arePointsClockwise = (points: Array<[number, number]>): boolean => {
+  let area = 0
+  for (let i = 0; i < points.length; i++) {
+    const j = (i + 1) % points.length
+    area += points[i]![0] * points[j]![1]
+    area -= points[j]![0] * points[i]![1]
+  }
+  return area / 2 <= 0
+}
 
 const COPPER_COLOR = new THREE.Color(...defaultColors.copper)
 const PLATED_HOLE_LIP_HEIGHT = 0.05
@@ -31,6 +42,7 @@ export interface ProcessPlatedHolesResult {
 
 export function processPlatedHolesForManifold(
   Manifold: ManifoldToplevel["Manifold"],
+  CrossSection: ManifoldToplevel["CrossSection"],
   circuitJson: AnyCircuitElement[],
   pcbThickness: number,
   manifoldInstancesForCleanup: any[],
@@ -410,6 +422,183 @@ export function processPlatedHolesForManifold(
       const threeGeom = manifoldMeshToThreeGeometry(finalCopperOp.getMesh())
       platedHoleCopperGeoms.push({
         key: `ph-${ph.pcb_plated_hole_id || index}`,
+        geometry: threeGeom,
+        color: COPPER_COLOR,
+      })
+    } else if (ph.shape === "hole_with_polygon_pad") {
+      const polygonHole = ph as PcbHoleWithPolygonPad
+      if (!polygonHole.pad_outline || polygonHole.pad_outline.length < 3) {
+        console.warn(
+          `pcb_plated_hole ${polygonHole.pcb_plated_hole_id} missing pad_outline`,
+        )
+        return
+      }
+
+      const holeShape = polygonHole.hole_shape || "circle"
+      const holeOffsetX = polygonHole.hole_offset_x || 0
+      const holeOffsetY = polygonHole.hole_offset_y || 0
+      const holeCenterX = polygonHole.x + holeOffsetX
+      const holeCenterY = polygonHole.y + holeOffsetY
+      const drillDepth = pcbThickness * 1.2
+      const copperPartThickness = pcbThickness + 2 * MANIFOLD_Z_OFFSET
+      const insetAmount = 2 * PLATED_HOLE_LIP_HEIGHT
+
+      let outlinePoints: Array<[number, number]> = polygonHole.pad_outline.map(
+        (point) => [point.x, point.y],
+      )
+      if (arePointsClockwise(outlinePoints)) {
+        outlinePoints = outlinePoints.reverse()
+      }
+      const padCrossSection = CrossSection.ofPolygons([outlinePoints])
+      manifoldInstancesForCleanup.push(padCrossSection)
+      const padPrism = Manifold.extrude(
+        padCrossSection,
+        copperPartThickness,
+        0,
+        0,
+        [1, 1],
+        true,
+      )
+      manifoldInstancesForCleanup.push(padPrism)
+      const translatedPadPrism = padPrism.translate([polygonHole.x, polygonHole.y, 0])
+      manifoldInstancesForCleanup.push(translatedPadPrism)
+
+      const translateToHole = (op: any) => {
+        const translated = op.translate([holeCenterX, holeCenterY, 0])
+        manifoldInstancesForCleanup.push(translated)
+        return translated
+      }
+
+      const maybeRotatePill = (op: any) => {
+        if (holeShape === "rotated_pill" && typeof polygonHole.ccw_rotation === "number") {
+          const rotated = op.rotate([0, 0, polygonHole.ccw_rotation])
+          manifoldInstancesForCleanup.push(rotated)
+          return rotated
+        }
+        return op
+      }
+
+      let boardDrillOp: any | null = null
+      let barrelOuter: any | null = null
+      let barrelInner: any | null = null
+      let holeCutOp: any | null = null
+
+      if (holeShape === "circle") {
+        if (typeof polygonHole.hole_diameter !== "number") {
+          console.warn(
+            `pcb_plated_hole ${polygonHole.pcb_plated_hole_id} missing hole_diameter`,
+          )
+          return
+        }
+        const translatedDrill = createCircleHoleDrill({
+          Manifold,
+          x: holeCenterX,
+          y: holeCenterY,
+          diameter: polygonHole.hole_diameter,
+          thickness: pcbThickness,
+          segments: SMOOTH_CIRCLE_SEGMENTS,
+        })
+        manifoldInstancesForCleanup.push(translatedDrill)
+        boardDrillOp = translatedDrill
+
+        const outerCylinder = Manifold.cylinder(
+          copperPartThickness,
+          polygonHole.hole_diameter / 2,
+          polygonHole.hole_diameter / 2,
+          SMOOTH_CIRCLE_SEGMENTS,
+          true,
+        )
+        manifoldInstancesForCleanup.push(outerCylinder)
+        barrelOuter = translateToHole(outerCylinder)
+
+        const innerDiameter = Math.max(
+          polygonHole.hole_diameter - insetAmount,
+          M,
+        )
+        const innerCylinder = Manifold.cylinder(
+          copperPartThickness * 1.05,
+          innerDiameter / 2,
+          innerDiameter / 2,
+          SMOOTH_CIRCLE_SEGMENTS,
+          true,
+        )
+        manifoldInstancesForCleanup.push(innerCylinder)
+        barrelInner = translateToHole(innerCylinder)
+
+        const drillCut = Manifold.cylinder(
+          drillDepth,
+          Math.max(innerDiameter / 2, M / 2),
+          Math.max(innerDiameter / 2, M / 2),
+          SMOOTH_CIRCLE_SEGMENTS,
+          true,
+        )
+        manifoldInstancesForCleanup.push(drillCut)
+        holeCutOp = translateToHole(drillCut)
+      } else if (
+        (holeShape === "oval" || holeShape === "pill" || holeShape === "rotated_pill") &&
+        typeof polygonHole.hole_width === "number" &&
+        typeof polygonHole.hole_height === "number"
+      ) {
+        const drillWidth = polygonHole.hole_width + 2 * MANIFOLD_Z_OFFSET
+        const drillHeight = polygonHole.hole_height + 2 * MANIFOLD_Z_OFFSET
+        let drillOp = createPillOp(drillWidth, drillHeight, drillDepth)
+        drillOp = maybeRotatePill(drillOp)
+        const translatedDrill = translateToHole(drillOp)
+        boardDrillOp = translatedDrill
+
+        let outerPill = createPillOp(
+          polygonHole.hole_width,
+          polygonHole.hole_height,
+          copperPartThickness,
+        )
+        outerPill = maybeRotatePill(outerPill)
+        barrelOuter = translateToHole(outerPill)
+
+        const innerWidth = Math.max(polygonHole.hole_width - insetAmount, M)
+        const innerHeight = Math.max(polygonHole.hole_height - insetAmount, M)
+        let innerPill = createPillOp(
+          innerWidth,
+          innerHeight,
+          copperPartThickness * 1.05,
+        )
+        innerPill = maybeRotatePill(innerPill)
+        barrelInner = translateToHole(innerPill)
+
+        let holeCutPill = createPillOp(innerWidth, innerHeight, drillDepth)
+        holeCutPill = maybeRotatePill(holeCutPill)
+        holeCutOp = translateToHole(holeCutPill)
+      } else {
+        console.warn(
+          `pcb_plated_hole ${polygonHole.pcb_plated_hole_id} has unsupported hole_shape`,
+        )
+        continue
+      }
+
+      if (boardDrillOp) {
+        platedHoleBoardDrills.push(boardDrillOp)
+      }
+
+      if (!barrelOuter || !barrelInner || !holeCutOp) {
+        continue
+      }
+
+      const barrelShell = barrelOuter.subtract(barrelInner)
+      manifoldInstancesForCleanup.push(barrelShell)
+      const padWithHole = translatedPadPrism.subtract(holeCutOp)
+      manifoldInstancesForCleanup.push(padWithHole)
+      let combinedCopper = Manifold.union([padWithHole, barrelShell])
+      manifoldInstancesForCleanup.push(combinedCopper)
+
+      if (boardClipVolume) {
+        const clipped = Manifold.intersection([combinedCopper, boardClipVolume])
+        manifoldInstancesForCleanup.push(clipped)
+        combinedCopper = clipped
+      }
+
+      platedHoleCopperOpsForSubtract.push(combinedCopper)
+      const threeGeom = manifoldMeshToThreeGeometry(combinedCopper.getMesh())
+      platedHoleCopperGeoms.push({
+        key: `ph-${polygonHole.pcb_plated_hole_id || index}`,
         geometry: threeGeom,
         color: COPPER_COLOR,
       })

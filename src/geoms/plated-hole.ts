@@ -3,6 +3,7 @@ import type { Geom3 } from "@jscad/modeling/src/geometries/types"
 import {
   cuboid,
   cylinder,
+  polygon as jscadPolygon,
   roundedRectangle,
 } from "@jscad/modeling/src/primitives"
 import { colorize } from "@jscad/modeling/src/colors"
@@ -14,17 +15,116 @@ import {
 import { BOARD_SURFACE_OFFSET, M, colors } from "./constants"
 import type { GeomContext } from "../GeomContext"
 import { extrudeLinear } from "@jscad/modeling/src/operations/extrusions"
-import { translate } from "@jscad/modeling/src/operations/transforms"
+import { rotateZ, translate } from "@jscad/modeling/src/operations/transforms"
 import {
   clampRectBorderRadius,
   extractRectBorderRadius,
 } from "../utils/rect-border-radius"
+import type { Vec2 } from "@jscad/modeling/src/maths/types"
+import { arePointsClockwise } from "./create-board-with-outline"
+import type { PcbHoleWithPolygonPad } from "../types/pcb-hole-with-polygon-pad"
 
 const platedHoleLipHeight = 0.02
 const RECT_PAD_SEGMENTS = 64
 
 const maybeClip = (geom: Geom3, clipGeom?: Geom3 | null) =>
   clipGeom ? intersect(clipGeom, geom) : geom
+
+const toRadians = (deg: number) => (deg * Math.PI) / 180
+
+const ensureCounterClockwise = (points: Vec2[]): Vec2[] => {
+  if (arePointsClockwise(points)) {
+    return [...points].reverse()
+  }
+  return points
+}
+
+const createPillSolid = ({
+  center,
+  width,
+  height,
+  depth,
+}: {
+  center: [number, number, number]
+  width: number
+  height: number
+  depth: number
+}): Geom3 => {
+  const holeRadius = Math.min(width, height) / 2
+  const rectLength = Math.abs(width - height)
+  const longAxisIsX = width >= height
+
+  const block = cuboid({
+    center,
+    size: longAxisIsX
+      ? [Math.max(rectLength, M), height, depth]
+      : [width, Math.max(rectLength, M), depth],
+  })
+
+  const offset = rectLength / 2
+  const firstCylinder = cylinder({
+    center: longAxisIsX
+      ? [center[0] - offset, center[1], center[2]]
+      : [center[0], center[1] - offset, center[2]],
+    radius: holeRadius,
+    height: depth,
+  })
+
+  const secondCylinder = cylinder({
+    center: longAxisIsX
+      ? [center[0] + offset, center[1], center[2]]
+      : [center[0], center[1] + offset, center[2]],
+    radius: holeRadius,
+    height: depth,
+  })
+
+  return union(block, firstCylinder, secondCylinder)
+}
+
+const createHoleBodyForPolygonPad = (
+  hole: PcbHoleWithPolygonPad,
+  depth: number,
+  inset = 0,
+): Geom3 | null => {
+  const holeShape = hole.hole_shape || "circle"
+  const center: [number, number, number] = [
+    hole.x + (hole.hole_offset_x || 0),
+    hole.y + (hole.hole_offset_y || 0),
+    0,
+  ]
+
+  if (holeShape === "circle") {
+    const diameter = Math.max((hole.hole_diameter || 0) - inset * 2, M)
+    if (diameter <= 0) return null
+    return cylinder({
+      center,
+      radius: Math.max(diameter / 2, M / 2),
+      height: depth,
+    })
+  }
+
+  if (
+    holeShape === "oval" ||
+    holeShape === "pill" ||
+    holeShape === "rotated_pill"
+  ) {
+    const width = Math.max((hole.hole_width || hole.hole_diameter || 0) - inset * 2, M)
+    const height = Math.max(
+      (hole.hole_height || hole.hole_diameter || 0) - inset * 2,
+      M,
+    )
+
+    if (width <= 0 || height <= 0) return null
+
+    let pill = createPillSolid({ center, width, height, depth })
+    if (holeShape === "rotated_pill" && typeof hole.ccw_rotation === "number") {
+      pill = rotateZ(toRadians(hole.ccw_rotation), pill)
+    }
+    return pill
+  }
+
+  return null
+}
 
 const createRectPadGeom = ({
   width,
@@ -185,6 +285,57 @@ export const platedHole = (
     }
 
     return colorize(colors.copper, subtract(finalCopper, drill))
+  }
+
+  if (plated_hole.shape === "hole_with_polygon_pad") {
+    const polygonHole = plated_hole as PcbHoleWithPolygonPad
+    const outlinePoints: Vec2[] = (polygonHole.pad_outline || []).map((point) => [
+      point.x,
+      point.y,
+    ])
+
+    if (outlinePoints.length < 3) {
+      console.warn(
+        `pcb_plated_hole ${polygonHole.pcb_plated_hole_id} has an invalid pad_outline`,
+      )
+      const fallback = maybeClip(
+        cylinder({
+          center: [polygonHole.x, polygonHole.y, 0],
+          radius: Math.max(polygonHole.hole_diameter || 0.5, 0.5) / 2,
+          height: copperSpan,
+        }),
+        clipGeom,
+      )
+      return colorize(colors.copper, fallback)
+    }
+
+    const ccwPoints = ensureCounterClockwise(outlinePoints)
+    const polygon2d = jscadPolygon({ points: ccwPoints })
+    const padExtrusion = extrudeLinear({ height: copperSpan }, polygon2d)
+    const padSolid = translate([polygonHole.x, polygonHole.y, bottomSurfaceZ], padExtrusion)
+
+    const holeCut = createHoleBodyForPolygonPad(
+      polygonHole,
+      throughDrillHeight,
+      platedHoleLipHeight,
+    )
+    const barrelOuter = createHoleBodyForPolygonPad(polygonHole, copperSpan, 0)
+    const barrelInner = createHoleBodyForPolygonPad(
+      polygonHole,
+      copperSpan + 2 * M,
+      platedHoleLipHeight,
+    )
+
+    if (!holeCut || !barrelOuter || !barrelInner) {
+      const clipped = maybeClip(padSolid, clipGeom)
+      return colorize(colors.copper, clipped)
+    }
+
+    const padWithHole = subtract(padSolid, holeCut)
+    const barrelShell = subtract(barrelOuter, barrelInner)
+    let finalCopper = union(padWithHole, barrelShell)
+    finalCopper = maybeClip(finalCopper, clipGeom)
+    return colorize(colors.copper, finalCopper)
   }
 
   if (plated_hole.shape === "pill") {
