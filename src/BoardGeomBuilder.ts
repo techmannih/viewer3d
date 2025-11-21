@@ -534,33 +534,77 @@ export class BoardGeomBuilder {
         const pillRadius = Math.min(pillWidth, pillHeight) / 2
         const pillRectLength = Math.abs(pillWidth - pillHeight)
 
+        const createCenteredPill = () => {
+          if (pillRectLength <= 1e-6) {
+            return cylinder({
+              center: [0, 0, 0],
+              radius: pillRadius,
+              height: this.ctx.pcbThickness * 1.5,
+            })
+          }
+
+          if (pillWidth >= pillHeight) {
+            return union(
+              cuboid({
+                center: [0, 0, 0],
+                size: [pillRectLength, pillHeight, this.ctx.pcbThickness * 1.5],
+              }),
+              cylinder({
+                center: [-pillRectLength / 2, 0, 0],
+                radius: pillRadius,
+                height: this.ctx.pcbThickness * 1.5,
+              }),
+              cylinder({
+                center: [pillRectLength / 2, 0, 0],
+                radius: pillRadius,
+                height: this.ctx.pcbThickness * 1.5,
+              }),
+            )
+          }
+
+          return union(
+            cuboid({
+              center: [0, 0, 0],
+              size: [pillWidth, pillRectLength, this.ctx.pcbThickness * 1.5],
+            }),
+            cylinder({
+              center: [0, -pillRectLength / 2, 0],
+              radius: pillRadius,
+              height: this.ctx.pcbThickness * 1.5,
+            }),
+            cylinder({
+              center: [0, pillRectLength / 2, 0],
+              radius: pillRadius,
+              height: this.ctx.pcbThickness * 1.5,
+            }),
+          )
+        }
+
         const basePillHole = union(
-          cuboid({
-            center: [0, 0, 0],
-            size: useShouldRotate
-              ? shouldRotate
-                ? [holeHeight, rectLength, this.ctx.pcbThickness * 1.5]
-                : [rectLength, holeHeight, this.ctx.pcbThickness * 1.5]
-              : [pillRectLength, pillHeight, this.ctx.pcbThickness * 1.5],
-          }),
-          cylinder({
-            center: useShouldRotate
-              ? shouldRotate
-                ? [0, -rectLength / 2, 0]
-                : [-rectLength / 2, 0, 0]
-              : [-pillRectLength / 2, 0, 0],
-            radius: useShouldRotate ? holeRadius : pillRadius,
-            height: this.ctx.pcbThickness * 1.5,
-          }),
-          cylinder({
-            center: useShouldRotate
-              ? shouldRotate
-                ? [0, rectLength / 2, 0]
-                : [rectLength / 2, 0, 0]
-              : [pillRectLength / 2, 0, 0],
-            radius: useShouldRotate ? holeRadius : pillRadius,
-            height: this.ctx.pcbThickness * 1.5,
-          }),
+          useShouldRotate
+            ? union(
+                cuboid({
+                  center: [0, 0, 0],
+                  size: shouldRotate
+                    ? [holeHeight, rectLength, this.ctx.pcbThickness * 1.5]
+                    : [rectLength, holeHeight, this.ctx.pcbThickness * 1.5],
+                }),
+                cylinder({
+                  center: shouldRotate
+                    ? [0, -rectLength / 2, 0]
+                    : [-rectLength / 2, 0, 0],
+                  radius: holeRadius,
+                  height: this.ctx.pcbThickness * 1.5,
+                }),
+                cylinder({
+                  center: shouldRotate
+                    ? [0, rectLength / 2, 0]
+                    : [rectLength / 2, 0, 0],
+                  radius: holeRadius,
+                  height: this.ctx.pcbThickness * 1.5,
+                }),
+              )
+            : createCenteredPill(),
         )
 
         // Apply rotation if this is a rotated_pill_hole_with_rect_pad

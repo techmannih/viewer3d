@@ -522,17 +522,17 @@ export const platedHole = (
 
       const rect = cuboid({
         center: [0, 0, centerZ],
-        size: [length, height, thickness],
+        size: width >= height ? [length, height, thickness] : [width, length, thickness],
       })
 
       const leftCap = cylinder({
-        center: [-length / 2, 0, centerZ],
+        center: width >= height ? [-length / 2, 0, centerZ] : [0, -length / 2, centerZ],
         radius,
         height: thickness,
       })
 
       const rightCap = cylinder({
-        center: [length / 2, 0, centerZ],
+        center: width >= height ? [length / 2, 0, centerZ] : [0, length / 2, centerZ],
         radius,
         height: thickness,
       })
