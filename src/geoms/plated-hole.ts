@@ -298,6 +298,17 @@ export const platedHole = (
   if (plated_hole.shape === "pill_hole_with_rect_pad") {
     const holeOffsetX = plated_hole.hole_offset_x || 0
     const holeOffsetY = plated_hole.hole_offset_y || 0
+    const rotationRadians = ((plated_hole.ccw_rotation || 0) * Math.PI) / 180
+    const rotateAroundPoint = (
+      geom: Geom3,
+      [cx, cy]: [number, number],
+    ) =>
+      rotationRadians
+        ? translate([cx, cy, 0], rotateZ(rotationRadians, translate([-cx, -cy, 0], geom)))
+        : geom
+
+    const holeCenter = [plated_hole.x + holeOffsetX, plated_hole.y + holeOffsetY] as const
+    const padCenter = [plated_hole.x, plated_hole.y] as const
     const shouldRotate = plated_hole.hole_height! > plated_hole.hole_width!
     const holeWidth = shouldRotate
       ? plated_hole.hole_height!
@@ -437,9 +448,19 @@ export const platedHole = (
     })()
 
     // --- Cut pads with the hole ---
-    const copperTopPadCut = subtract(copperTopPad, holeCut)
-    const copperBottomPadCut = subtract(copperBottomPad, holeCut)
-    const copperFillCut = subtract(copperFill, holeCut)
+    const rotatedHoleCut = rotateAroundPoint(holeCut, holeCenter)
+    const copperTopPadCut = subtract(
+      rotateAroundPoint(copperTopPad, padCenter),
+      rotatedHoleCut,
+    )
+    const copperBottomPadCut = subtract(
+      rotateAroundPoint(copperBottomPad, padCenter),
+      rotatedHoleCut,
+    )
+    const copperFillCut = subtract(
+      rotateAroundPoint(copperFill, padCenter),
+      rotatedHoleCut,
+    )
 
     // --- Barrel internal cut (keeps thin copper rim) ---
     const barrelHoleCut = union(
@@ -481,7 +502,10 @@ export const platedHole = (
       }),
     )
 
-    const barrelWithHole = subtract(barrel, barrelHoleCut)
+    const barrelWithHole = subtract(
+      rotateAroundPoint(barrel, holeCenter),
+      rotateAroundPoint(barrelHoleCut, holeCenter),
+    )
 
     // --- Combine all copper pieces ---
     const finalCopper = maybeClip(
