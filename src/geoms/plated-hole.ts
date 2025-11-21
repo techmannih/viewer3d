@@ -486,7 +486,7 @@ export const platedHole = (
     const holeOffsetY = plated_hole.hole_offset_y || 0
     const holeWidth = plated_hole.hole_width!
     const holeHeight = plated_hole.hole_height!
-    const holeRadius = holeHeight / 2
+    const holeRadius = Math.min(holeWidth, holeHeight) / 2
     const rectLength = Math.abs(holeWidth - holeHeight)
     const holeRotationRad =
       ((plated_hole.hole_ccw_rotation || 0) * Math.PI) / 180
@@ -509,7 +509,7 @@ export const platedHole = (
       centerZ: number,
       rotationRad: number,
     ) => {
-      const radius = height / 2
+      const radius = Math.min(width, height) / 2
       const length = Math.abs(width - height)
 
       if (length <= 1e-6) {

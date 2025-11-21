@@ -513,7 +513,7 @@ export class BoardGeomBuilder {
       const shouldRotate = ph.hole_height! > ph.hole_width!
       const holeWidth = shouldRotate ? ph.hole_height! : ph.hole_width!
       const holeHeight = shouldRotate ? ph.hole_width! : ph.hole_height!
-      const holeRadius = holeHeight / 2
+      const holeRadius = Math.min(holeWidth, holeHeight) / 2
       const rectLength = Math.abs(holeWidth - holeHeight)
 
       let pillHole: Geom3
@@ -531,7 +531,7 @@ export class BoardGeomBuilder {
         const useShouldRotate = ph.shape === "pill_hole_with_rect_pad"
         const pillWidth = useShouldRotate ? holeWidth : ph.hole_width!
         const pillHeight = useShouldRotate ? holeHeight : ph.hole_height!
-        const pillRadius = pillHeight / 2
+        const pillRadius = Math.min(pillWidth, pillHeight) / 2
         const pillRectLength = Math.abs(pillWidth - pillHeight)
 
         const basePillHole = union(
