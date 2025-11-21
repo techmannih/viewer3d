@@ -488,7 +488,7 @@ export const platedHole = (
     const holeOffsetY = plated_hole.hole_offset_y || 0
     const holeWidth = plated_hole.hole_width!
     const holeHeight = plated_hole.hole_height!
-    const holeRadius = holeHeight / 2
+    const holeRadius = Math.min(holeWidth, holeHeight) / 2
     const rectLength = Math.abs(holeWidth - holeHeight)
     const holeRotationRad =
       ((plated_hole.hole_ccw_rotation || 0) * Math.PI) / 180
@@ -511,7 +511,7 @@ export const platedHole = (
       centerZ: number,
       rotationRad: number,
     ) => {
-      const radius = height / 2
+      const radius = Math.min(width, height) / 2
       const length = Math.abs(width - height)
 
       if (length <= 1e-6) {
@@ -524,17 +524,17 @@ export const platedHole = (
 
       const rect = cuboid({
         center: [0, 0, centerZ],
-        size: [length, height, thickness],
+        size: width >= height ? [length, height, thickness] : [width, length, thickness],
       })
 
       const leftCap = cylinder({
-        center: [-length / 2, 0, centerZ],
+        center: width >= height ? [-length / 2, 0, centerZ] : [0, -length / 2, centerZ],
         radius,
         height: thickness,
       })
 
       const rightCap = cylinder({
-        center: [length / 2, 0, centerZ],
+        center: width >= height ? [length / 2, 0, centerZ] : [0, length / 2, centerZ],
         radius,
         height: thickness,
       })
