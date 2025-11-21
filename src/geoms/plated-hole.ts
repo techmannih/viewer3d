@@ -15,7 +15,7 @@ import {
 import { BOARD_SURFACE_OFFSET, M, colors } from "./constants"
 import type { GeomContext } from "../GeomContext"
 import { extrudeLinear } from "@jscad/modeling/src/operations/extrusions"
-import { translate } from "@jscad/modeling/src/operations/transforms"
+import { rotateZ, translate } from "@jscad/modeling/src/operations/transforms"
 import {
   clampRectBorderRadius,
   extractRectBorderRadius,
@@ -211,6 +211,18 @@ export const platedHole = (
     const outerRectLength = Math.abs(outerPillWidth - outerPillHeight)
     const copperHeight = copperSpan + 0.01
 
+    const applyRotation = (geom: Geom3) => {
+      if (!plated_hole.ccw_rotation) return geom
+      const rotationRadians = (plated_hole.ccw_rotation * Math.PI) / 180
+      return translate(
+        [plated_hole.x, plated_hole.y, 0],
+        rotateZ(
+          rotationRadians,
+          translate([-plated_hole.x, -plated_hole.y, 0], geom),
+        ),
+      )
+    }
+
     const createPillSection = (
       width: number,
       height: number,
@@ -281,8 +293,8 @@ export const platedHole = (
     })
     const drillUnion = union(drillRect, drillLeftCap, drillRightCap)
 
-    const copperSolid = maybeClip(outerBarrel, clipGeom)
-    const drill = drillUnion
+    const copperSolid = maybeClip(applyRotation(outerBarrel), clipGeom)
+    const drill = applyRotation(drillUnion)
 
     return colorize(colors.copper, subtract(copperSolid, drill))
     // biome-ignore lint/style/noUselessElse: <explanation>

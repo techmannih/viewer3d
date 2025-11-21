@@ -649,6 +649,14 @@ export class BoardGeomBuilder {
           }),
         )
       }
+
+      if (ph.ccw_rotation) {
+        const rotationRadians = (ph.ccw_rotation * Math.PI) / 180
+        pillHole = translate(
+          [ph.x, ph.y, 0],
+          rotateZ(rotationRadians, translate([-ph.x, -ph.y, 0], pillHole)),
+        )
+      }
       if (!opts.dontCutBoard) {
         this.boardGeom = subtract(this.boardGeom, pillHole)
       }
