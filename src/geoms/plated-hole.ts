@@ -15,7 +15,7 @@ import {
 import { BOARD_SURFACE_OFFSET, M, colors } from "./constants"
 import type { GeomContext } from "../GeomContext"
 import { extrudeLinear } from "@jscad/modeling/src/operations/extrusions"
-import { translate } from "@jscad/modeling/src/operations/transforms"
+import { rotateZ, translate } from "@jscad/modeling/src/operations/transforms"
 import {
   clampRectBorderRadius,
   extractRectBorderRadius,
@@ -72,6 +72,16 @@ export const platedHole = (
   const topSurfaceZ = ctx.pcbThickness / 2 + BOARD_SURFACE_OFFSET.copper
   const bottomSurfaceZ = -ctx.pcbThickness / 2 - BOARD_SURFACE_OFFSET.copper
   const copperSpan = topSurfaceZ - bottomSurfaceZ
+  const rotationRadians = ((plated_hole.ccw_rotation ?? 0) * Math.PI) / 180
+
+  const applyRotation = (geom: Geom3) => {
+    if (!rotationRadians) return geom
+
+    return translate(
+      [plated_hole.x, plated_hole.y, 0],
+      rotateZ(rotationRadians, translate([-plated_hole.x, -plated_hole.y, 0], geom)),
+    )
+  }
   if (plated_hole.shape === "circle") {
     const outerDiameter =
       plated_hole.outer_diameter ?? Math.max(plated_hole.hole_diameter, 0)
@@ -253,10 +263,8 @@ export const platedHole = (
       return union(rect, leftCap, rightCap)
     }
 
-    const outerBarrel = createPillSection(
-      outerPillWidth,
-      outerPillHeight,
-      copperHeight,
+    const outerBarrel = applyRotation(
+      createPillSection(outerPillWidth, outerPillHeight, copperHeight),
     )
 
     const drillRect = cuboid({
@@ -279,7 +287,7 @@ export const platedHole = (
       radius: holeRadius - M,
       height: throughDrillHeight,
     })
-    const drillUnion = union(drillRect, drillLeftCap, drillRightCap)
+    const drillUnion = applyRotation(union(drillRect, drillLeftCap, drillRightCap))
 
     const copperSolid = maybeClip(outerBarrel, clipGeom)
     const drill = drillUnion
@@ -477,7 +485,9 @@ export const platedHole = (
 
     // --- Combine all copper pieces ---
     const finalCopper = maybeClip(
-      union(copperTopPadCut, copperBottomPadCut, copperFillCut, barrelWithHole),
+      applyRotation(
+        union(copperTopPadCut, copperBottomPadCut, copperFillCut, barrelWithHole),
+      ),
       clipGeom,
     )
 
