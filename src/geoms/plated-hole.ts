@@ -15,7 +15,7 @@ import {
 import { BOARD_SURFACE_OFFSET, M, colors } from "./constants"
 import type { GeomContext } from "../GeomContext"
 import { extrudeLinear } from "@jscad/modeling/src/operations/extrusions"
-import { translate } from "@jscad/modeling/src/operations/transforms"
+import { rotateZ, translate } from "@jscad/modeling/src/operations/transforms"
 import {
   clampRectBorderRadius,
   extractRectBorderRadius,
@@ -72,6 +72,14 @@ export const platedHole = (
   const topSurfaceZ = ctx.pcbThickness / 2 + BOARD_SURFACE_OFFSET.copper
   const bottomSurfaceZ = -ctx.pcbThickness / 2 - BOARD_SURFACE_OFFSET.copper
   const copperSpan = topSurfaceZ - bottomSurfaceZ
+
+  const rotateAroundCenter = (geom: Geom3) => {
+    if (!plated_hole.ccw_rotation) return geom
+    const radians = (plated_hole.ccw_rotation * Math.PI) / 180
+    const movedToOrigin = translate([-plated_hole.x, -plated_hole.y, 0], geom)
+    const rotated = rotateZ(radians, movedToOrigin)
+    return translate([plated_hole.x, plated_hole.y, 0], rotated)
+  }
   if (plated_hole.shape === "circle") {
     const outerDiameter =
       plated_hole.outer_diameter ?? Math.max(plated_hole.hole_diameter, 0)
@@ -90,7 +98,7 @@ export const platedHole = (
       height: throughDrillHeight,
     })
 
-    return colorize(colors.copper, subtract(copperSolid, drill))
+    return rotateAroundCenter(colorize(colors.copper, subtract(copperSolid, drill)))
   }
   if (plated_hole.shape === "circular_hole_with_rect_pad") {
     const holeOffsetX = plated_hole.hole_offset_x || 0
@@ -284,7 +292,8 @@ export const platedHole = (
     const copperSolid = maybeClip(outerBarrel, clipGeom)
     const drill = drillUnion
 
-    return colorize(colors.copper, subtract(copperSolid, drill))
+    const platedPill = colorize(colors.copper, subtract(copperSolid, drill))
+    return rotateAroundCenter(platedPill)
     // biome-ignore lint/style/noUselessElse: <explanation>
   }
   if (plated_hole.shape === "pill_hole_with_rect_pad") {
@@ -481,7 +490,7 @@ export const platedHole = (
       clipGeom,
     )
 
-    return colorize(colors.copper, finalCopper)
+    return rotateAroundCenter(colorize(colors.copper, finalCopper))
   } else if (plated_hole.shape === "hole_with_polygon_pad") {
     const padOutline = plated_hole.pad_outline
     if (!Array.isArray(padOutline) || padOutline.length < 3) {

@@ -541,6 +541,14 @@ export class BoardGeomBuilder {
   ) {
     if (!this.boardGeom) return
 
+    const rotateAroundPoint = (geom: Geom3) => {
+      if (!ph.ccw_rotation) return geom
+      const radians = (ph.ccw_rotation * Math.PI) / 180
+      const toOrigin = translate([-ph.x, -ph.y, 0], geom)
+      const rotated = rotateZ(radians, toOrigin)
+      return translate([ph.x, ph.y, 0], rotated)
+    }
+
     if (ph.shape === "circle" || ph.shape === "circular_hole_with_rect_pad") {
       let cyGeom: Geom3 | null = null
 
@@ -649,6 +657,8 @@ export class BoardGeomBuilder {
           }),
         )
       }
+
+      pillHole = rotateAroundPoint(pillHole)
       if (!opts.dontCutBoard) {
         this.boardGeom = subtract(this.boardGeom, pillHole)
       }
