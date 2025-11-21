@@ -15,7 +15,7 @@ import {
 import { BOARD_SURFACE_OFFSET, M, colors } from "./constants"
 import type { GeomContext } from "../GeomContext"
 import { extrudeLinear } from "@jscad/modeling/src/operations/extrusions"
-import { translate } from "@jscad/modeling/src/operations/transforms"
+import { rotateZ, translate } from "@jscad/modeling/src/operations/transforms"
 import {
   clampRectBorderRadius,
   extractRectBorderRadius,
@@ -192,6 +192,12 @@ export const platedHole = (
   if (plated_hole.shape === "pill") {
     const shouldRotate = plated_hole.hole_height! > plated_hole.hole_width!
 
+    const holeCenter: [number, number, number] = [
+      plated_hole.x,
+      plated_hole.y,
+      0,
+    ]
+
     const holeWidth = shouldRotate
       ? plated_hole.hole_height!
       : plated_hole.hole_width!
@@ -221,14 +227,14 @@ export const platedHole = (
 
       if (length <= 1e-6) {
         return cylinder({
-          center: [plated_hole.x, plated_hole.y, 0],
+          center: [0, 0, 0],
           radius,
           height: thickness,
         })
       }
 
       const rect = cuboid({
-        center: [plated_hole.x, plated_hole.y, 0],
+        center: [0, 0, 0],
         size: shouldRotate
           ? [height, length, thickness]
           : [length, height, thickness],
@@ -236,16 +242,16 @@ export const platedHole = (
 
       const leftCap = cylinder({
         center: shouldRotate
-          ? [plated_hole.x, plated_hole.y - length / 2, 0]
-          : [plated_hole.x - length / 2, plated_hole.y, 0],
+          ? [0, -length / 2, 0]
+          : [-length / 2, 0, 0],
         radius,
         height: thickness,
       })
 
       const rightCap = cylinder({
         center: shouldRotate
-          ? [plated_hole.x, plated_hole.y + length / 2, 0]
-          : [plated_hole.x + length / 2, plated_hole.y, 0],
+          ? [0, length / 2, 0]
+          : [length / 2, 0, 0],
         radius,
         height: thickness,
       })
@@ -260,29 +266,31 @@ export const platedHole = (
     )
 
     const drillRect = cuboid({
-      center: [plated_hole.x, plated_hole.y, 0],
+      center: [0, 0, 0],
       size: shouldRotate
         ? [holeHeight - 2 * M, rectLength, throughDrillHeight]
         : [rectLength, holeHeight - 2 * M, throughDrillHeight],
     })
     const drillLeftCap = cylinder({
-      center: shouldRotate
-        ? [plated_hole.x, plated_hole.y - rectLength / 2, 0]
-        : [plated_hole.x - rectLength / 2, plated_hole.y, 0],
+      center: shouldRotate ? [0, -rectLength / 2, 0] : [-rectLength / 2, 0, 0],
       radius: holeRadius - M,
       height: throughDrillHeight,
     })
     const drillRightCap = cylinder({
-      center: shouldRotate
-        ? [plated_hole.x, plated_hole.y + rectLength / 2, 0]
-        : [plated_hole.x + rectLength / 2, plated_hole.y, 0],
+      center: shouldRotate ? [0, rectLength / 2, 0] : [rectLength / 2, 0, 0],
       radius: holeRadius - M,
       height: throughDrillHeight,
     })
     const drillUnion = union(drillRect, drillLeftCap, drillRightCap)
 
-    const copperSolid = maybeClip(outerBarrel, clipGeom)
-    const drill = drillUnion
+    const applyTransforms = (geom: Geom3) => {
+      const rotationRadians = ((plated_hole.ccw_rotation || 0) * Math.PI) / 180
+      const rotated = rotationRadians ? rotateZ(rotationRadians, geom) : geom
+      return translate(holeCenter, rotated)
+    }
+
+    const copperSolid = maybeClip(applyTransforms(outerBarrel), clipGeom)
+    const drill = applyTransforms(drillUnion)
 
     return colorize(colors.copper, subtract(copperSolid, drill))
     // biome-ignore lint/style/noUselessElse: <explanation>
@@ -290,6 +298,17 @@ export const platedHole = (
   if (plated_hole.shape === "pill_hole_with_rect_pad") {
     const holeOffsetX = plated_hole.hole_offset_x || 0
     const holeOffsetY = plated_hole.hole_offset_y || 0
+    const rotationRadians = ((plated_hole.ccw_rotation || 0) * Math.PI) / 180
+    const rotateAroundPoint = (
+      geom: Geom3,
+      [cx, cy]: [number, number],
+    ) =>
+      rotationRadians
+        ? translate([cx, cy, 0], rotateZ(rotationRadians, translate([-cx, -cy, 0], geom)))
+        : geom
+
+    const holeCenter = [plated_hole.x + holeOffsetX, plated_hole.y + holeOffsetY] as const
+    const padCenter = [plated_hole.x, plated_hole.y] as const
     const shouldRotate = plated_hole.hole_height! > plated_hole.hole_width!
     const holeWidth = shouldRotate
       ? plated_hole.hole_height!
@@ -429,9 +448,19 @@ export const platedHole = (
     })()
 
     // --- Cut pads with the hole ---
-    const copperTopPadCut = subtract(copperTopPad, holeCut)
-    const copperBottomPadCut = subtract(copperBottomPad, holeCut)
-    const copperFillCut = subtract(copperFill, holeCut)
+    const rotatedHoleCut = rotateAroundPoint(holeCut, holeCenter)
+    const copperTopPadCut = subtract(
+      rotateAroundPoint(copperTopPad, padCenter),
+      rotatedHoleCut,
+    )
+    const copperBottomPadCut = subtract(
+      rotateAroundPoint(copperBottomPad, padCenter),
+      rotatedHoleCut,
+    )
+    const copperFillCut = subtract(
+      rotateAroundPoint(copperFill, padCenter),
+      rotatedHoleCut,
+    )
 
     // --- Barrel internal cut (keeps thin copper rim) ---
     const barrelHoleCut = union(
@@ -473,7 +502,10 @@ export const platedHole = (
       }),
     )
 
-    const barrelWithHole = subtract(barrel, barrelHoleCut)
+    const barrelWithHole = subtract(
+      rotateAroundPoint(barrel, holeCenter),
+      rotateAroundPoint(barrelHoleCut, holeCenter),
+    )
 
     // --- Combine all copper pieces ---
     const finalCopper = maybeClip(
