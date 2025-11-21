@@ -15,7 +15,7 @@ import {
 import { BOARD_SURFACE_OFFSET, M, colors } from "./constants"
 import type { GeomContext } from "../GeomContext"
 import { extrudeLinear } from "@jscad/modeling/src/operations/extrusions"
-import { translate } from "@jscad/modeling/src/operations/transforms"
+import { rotateZ, translate } from "@jscad/modeling/src/operations/transforms"
 import {
   clampRectBorderRadius,
   extractRectBorderRadius,
@@ -72,6 +72,17 @@ export const platedHole = (
   const topSurfaceZ = ctx.pcbThickness / 2 + BOARD_SURFACE_OFFSET.copper
   const bottomSurfaceZ = -ctx.pcbThickness / 2 - BOARD_SURFACE_OFFSET.copper
   const copperSpan = topSurfaceZ - bottomSurfaceZ
+  const rotationRadians = ((plated_hole.ccw_rotation ?? 0) * Math.PI) / 180
+  const rotateAroundHoleCenter = (geom: Geom3) =>
+    rotationRadians === 0
+      ? geom
+      : translate(
+          [plated_hole.x, plated_hole.y, 0],
+          rotateZ(
+            rotationRadians,
+            translate([-plated_hole.x, -plated_hole.y, 0], geom),
+          ),
+        )
   if (plated_hole.shape === "circle") {
     const outerDiameter =
       plated_hole.outer_diameter ?? Math.max(plated_hole.hole_diameter, 0)
@@ -284,7 +295,10 @@ export const platedHole = (
     const copperSolid = maybeClip(outerBarrel, clipGeom)
     const drill = drillUnion
 
-    return colorize(colors.copper, subtract(copperSolid, drill))
+    return colorize(
+      colors.copper,
+      rotateAroundHoleCenter(subtract(copperSolid, drill)),
+    )
     // biome-ignore lint/style/noUselessElse: <explanation>
   }
   if (plated_hole.shape === "pill_hole_with_rect_pad") {
@@ -481,7 +495,7 @@ export const platedHole = (
       clipGeom,
     )
 
-    return colorize(colors.copper, finalCopper)
+    return colorize(colors.copper, rotateAroundHoleCenter(finalCopper))
   } else if (plated_hole.shape === "hole_with_polygon_pad") {
     const padOutline = plated_hole.pad_outline
     if (!Array.isArray(padOutline) || padOutline.length < 3) {

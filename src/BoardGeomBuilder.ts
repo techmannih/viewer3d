@@ -574,9 +574,17 @@ export class BoardGeomBuilder {
       })
       this.platedHoleGeoms.push(platedHoleGeom)
     } else if (ph.shape === "pill" || ph.shape === "pill_hole_with_rect_pad") {
-      const shouldRotate = ph.hole_height! > ph.hole_width!
-      const holeWidth = shouldRotate ? ph.hole_height! : ph.hole_width!
-      const holeHeight = shouldRotate ? ph.hole_width! : ph.hole_height!
+      const rotationRadians = ((ph.ccw_rotation ?? 0) * Math.PI) / 180
+      const rotateAroundHoleCenter = (geom: Geom3) =>
+        rotationRadians === 0
+          ? geom
+          : translate(
+              [ph.x, ph.y, 0],
+              rotateZ(rotationRadians, translate([-ph.x, -ph.y, 0], geom)),
+            )
+
+      const holeWidth = ph.hole_width!
+      const holeHeight = ph.hole_height!
       const holeRadius = holeHeight / 2
       const rectLength = Math.abs(holeWidth - holeHeight)
 
@@ -590,37 +598,23 @@ export class BoardGeomBuilder {
               ph.y + (ph.hole_offset_y || 0),
               0,
             ],
-            size: shouldRotate
-              ? [holeHeight, rectLength, this.ctx.pcbThickness * 1.5]
-              : [rectLength, holeHeight, this.ctx.pcbThickness * 1.5],
+            size: [rectLength, holeHeight, this.ctx.pcbThickness * 1.5],
           }),
           cylinder({
-            center: shouldRotate
-              ? [
-                  ph.x + (ph.hole_offset_x || 0),
-                  ph.y + (ph.hole_offset_y || 0) - rectLength / 2,
-                  0,
-                ]
-              : [
-                  ph.x + (ph.hole_offset_x || 0) - rectLength / 2,
-                  ph.y + (ph.hole_offset_y || 0),
-                  0,
-                ],
+            center: [
+              ph.x + (ph.hole_offset_x || 0) - rectLength / 2,
+              ph.y + (ph.hole_offset_y || 0),
+              0,
+            ],
             radius: holeRadius,
             height: this.ctx.pcbThickness * 1.5,
           }),
           cylinder({
-            center: shouldRotate
-              ? [
-                  ph.x + (ph.hole_offset_x || 0),
-                  ph.y + (ph.hole_offset_y || 0) + rectLength / 2,
-                  0,
-                ]
-              : [
-                  ph.x + (ph.hole_offset_x || 0) + rectLength / 2,
-                  ph.y + (ph.hole_offset_y || 0),
-                  0,
-                ],
+            center: [
+              ph.x + (ph.hole_offset_x || 0) + rectLength / 2,
+              ph.y + (ph.hole_offset_y || 0),
+              0,
+            ],
             radius: holeRadius,
             height: this.ctx.pcbThickness * 1.5,
           }),
@@ -629,26 +623,22 @@ export class BoardGeomBuilder {
         pillHole = union(
           cuboid({
             center: [ph.x, ph.y, 0],
-            size: shouldRotate
-              ? [holeHeight, rectLength, this.ctx.pcbThickness * 1.5]
-              : [rectLength, holeHeight, this.ctx.pcbThickness * 1.5],
+            size: [rectLength, holeHeight, this.ctx.pcbThickness * 1.5],
           }),
           cylinder({
-            center: shouldRotate
-              ? [ph.x, ph.y - rectLength / 2, 0]
-              : [ph.x - rectLength / 2, ph.y, 0],
+            center: [ph.x - rectLength / 2, ph.y, 0],
             radius: holeRadius,
             height: this.ctx.pcbThickness * 1.5,
           }),
           cylinder({
-            center: shouldRotate
-              ? [ph.x, ph.y + rectLength / 2, 0]
-              : [ph.x + rectLength / 2, ph.y, 0],
+            center: [ph.x + rectLength / 2, ph.y, 0],
             radius: holeRadius,
             height: this.ctx.pcbThickness * 1.5,
           }),
         )
       }
+
+      pillHole = rotateAroundHoleCenter(pillHole)
       if (!opts.dontCutBoard) {
         this.boardGeom = subtract(this.boardGeom, pillHole)
       }
