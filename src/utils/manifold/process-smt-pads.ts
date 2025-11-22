@@ -23,6 +23,7 @@ export interface ProcessSmtPadsResult {
 
 export function processSmtPadsForManifold(
   Manifold: ManifoldToplevel["Manifold"],
+  CrossSection: ManifoldToplevel["CrossSection"],
   circuitJson: AnyCircuitElement[],
   pcbThickness: number,
   manifoldInstancesForCleanup: any[],
@@ -43,16 +44,24 @@ export function processSmtPadsForManifold(
         ? -pcbThickness / 2 - BOARD_SURFACE_OFFSET.copper
         : pcbThickness / 2 + BOARD_SURFACE_OFFSET.copper
 
-    let padManifoldOp = createPadManifoldOp({
+    const padOpResult = createPadManifoldOp({
       Manifold,
+      CrossSection,
       pad,
       padBaseThickness,
     })
 
-    if (padManifoldOp) {
-      manifoldInstancesForCleanup.push(padManifoldOp)
-      // @ts-ignore
-      const translatedPad = padManifoldOp.translate([pad.x, pad.y, zPos])
+    if (padOpResult) {
+      const { padOp, cleanup } = padOpResult
+      cleanup.forEach((instance) =>
+        manifoldInstancesForCleanup.push(instance),
+      )
+      manifoldInstancesForCleanup.push(padOp)
+
+      const xTranslation = typeof pad.x === "number" ? pad.x : 0
+      const yTranslation = typeof pad.y === "number" ? pad.y : 0
+
+      const translatedPad = padOp.translate([xTranslation, yTranslation, zPos])
       manifoldInstancesForCleanup.push(translatedPad)
       let finalPadOp = translatedPad
       if (holeUnion) {

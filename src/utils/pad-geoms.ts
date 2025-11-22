@@ -1,4 +1,5 @@
 import type { PcbSmtPad } from "circuit-json"
+import type { ManifoldToplevel } from "manifold-3d/manifold.d.ts"
 import {
   clampRectBorderRadius,
   extractRectBorderRadius,
@@ -59,24 +60,46 @@ export function createRoundedRectPrism({
   return Manifold.union(shapes)
 }
 
+const arePointsClockwise = (points: Array<[number, number]>): boolean => {
+  let area = 0
+  for (let i = 0; i < points.length; i++) {
+    const j = (i + 1) % points.length
+    const current = points[i]
+    const next = points[j]
+    if (!current || !next) continue
+    area += current[0] * next[1]
+    area -= next[0] * current[1]
+  }
+  const signedArea = area / 2
+  return signedArea <= 0
+}
+
+export interface PadManifoldOpResult {
+  padOp: any
+  cleanup: any[]
+}
+
 export function createPadManifoldOp({
   Manifold,
+  CrossSection,
   pad,
   padBaseThickness,
 }: {
   Manifold: any
+  CrossSection: ManifoldToplevel["CrossSection"]
   pad: PcbSmtPad
   padBaseThickness: number
-}) {
+}): PadManifoldOpResult | null {
   if (pad.shape === "rect") {
     const rectBorderRadius = extractRectBorderRadius(pad)
-    return createRoundedRectPrism({
+    const padOp = createRoundedRectPrism({
       Manifold,
       width: pad.width,
       height: pad.height,
       thickness: padBaseThickness,
       borderRadius: rectBorderRadius,
     })
+    return { padOp, cleanup: [] }
   } else if (pad.shape === "rotated_rect") {
     const rectBorderRadius = extractRectBorderRadius(pad)
     let padOp = createRoundedRectPrism({
@@ -92,9 +115,43 @@ export function createPadManifoldOp({
       padOp = padOp.rotate([0, 0, rotation])
     }
 
-    return padOp
+    return { padOp, cleanup: [] }
   } else if (pad.shape === "circle" && pad.radius) {
-    return Manifold.cylinder(padBaseThickness, pad.radius, -1, 32, true)
+    const padOp = Manifold.cylinder(
+      padBaseThickness,
+      pad.radius,
+      -1,
+      32,
+      true,
+    )
+    return { padOp, cleanup: [] }
+  } else if (pad.shape === "polygon") {
+    const polygonPad = pad as PcbSmtPad & {
+      points?: Array<{ x: number; y: number }>
+    }
+    if (!polygonPad.points || polygonPad.points.length < 3) {
+      return null
+    }
+
+    let pointsVec2 = polygonPad.points.map(
+      (point) => [point.x, point.y] as [number, number],
+    )
+
+    if (arePointsClockwise(pointsVec2)) {
+      pointsVec2 = pointsVec2.reverse()
+    }
+
+    const crossSection = CrossSection.ofPolygons([pointsVec2])
+    const padOp = Manifold.extrude(
+      crossSection,
+      padBaseThickness,
+      0,
+      0,
+      [1, 1],
+      true,
+    )
+
+    return { padOp, cleanup: [crossSection] }
   }
   return null
 }

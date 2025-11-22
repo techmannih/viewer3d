@@ -347,6 +347,7 @@ export const useManifoldBoardBuilder = (
       // Process SMT pads
       const { smtPadGeoms } = processSmtPadsForManifold(
         Manifold,
+        CrossSection,
         circuitJson,
         currentPcbThickness,
         manifoldInstancesForCleanup.current,
