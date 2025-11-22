@@ -103,6 +103,18 @@ export const platedHole = (
     const padHeight = plated_hole.rect_pad_height || plated_hole.hole_diameter
     const rectBorderRadius = extractRectBorderRadius(plated_hole)
     // Create a solid copper shape that connects the top and bottom pads
+    const mainCopperFillHeight = Math.max(copperSpan - platedHoleLipHeight * 2, M)
+    const mainCopperCenterZ = (topSurfaceZ + bottomSurfaceZ) / 2
+    const mainCopperFill2d = roundedRectangle({
+      size: [padWidth, padHeight],
+      roundRadius: rectBorderRadius || 0,
+      segments: RECT_PAD_SEGMENTS,
+    })
+    const mainCopperFill = translate(
+      [plated_hole.x, plated_hole.y, mainCopperCenterZ - mainCopperFillHeight / 2],
+      extrudeLinear({ height: mainCopperFillHeight }, mainCopperFill2d),
+    )
+
     const copperSolid = maybeClip(
       union(
         // Top rectangular pad (thicker to ensure connection)
@@ -122,22 +134,7 @@ export const platedHole = (
           borderRadius: rectBorderRadius,
         }),
         // Main copper fill between pads with rounded corners
-        (() => {
-          const height = Math.max(copperSpan - platedHoleLipHeight * 2, M)
-          const topPadBottom = topSurfaceZ
-          const bottomPadTop = bottomSurfaceZ
-          const centerZ = (topPadBottom + bottomPadTop) / 2
-          const rect2d = roundedRectangle({
-            size: [padWidth, padHeight],
-            roundRadius: rectBorderRadius || 0,
-            segments: RECT_PAD_SEGMENTS,
-          })
-          const extruded = extrudeLinear({ height }, rect2d)
-          return translate(
-            [plated_hole.x, plated_hole.y, centerZ - height / 2],
-            extruded,
-          )
-        })(),
+        mainCopperFill,
         // Plated barrel around hole (ensured connection with pads)
         cylinder({
           center: [
@@ -423,22 +420,17 @@ export const platedHole = (
       borderRadius: rectBorderRadius,
     })
 
-    const copperFill = (() => {
-      const height = Math.max(copperSpan - platedHoleLipHeight * 2, M)
-      const topPadBottom = topSurfaceZ
-      const bottomPadTop = bottomSurfaceZ
-      const centerZ = (topPadBottom + bottomPadTop) / 2
-      const rect2d = roundedRectangle({
-        size: [padWidth, padHeight],
-        roundRadius: rectBorderRadius || 0,
-        segments: RECT_PAD_SEGMENTS,
-      })
-      const extruded = extrudeLinear({ height }, rect2d)
-      return translate(
-        [plated_hole.x, plated_hole.y, centerZ - height / 2],
-        extruded,
-      )
-    })()
+    const copperFillHeight = Math.max(copperSpan - platedHoleLipHeight * 2, M)
+    const copperFillCenterZ = (topSurfaceZ + bottomSurfaceZ) / 2
+    const copperFill2d = roundedRectangle({
+      size: [padWidth, padHeight],
+      roundRadius: rectBorderRadius || 0,
+      segments: RECT_PAD_SEGMENTS,
+    })
+    const copperFill = translate(
+      [plated_hole.x, plated_hole.y, copperFillCenterZ - copperFillHeight / 2],
+      extrudeLinear({ height: copperFillHeight }, copperFill2d),
+    )
 
     // --- Cut pads with the hole ---
     const copperTopPadCut = subtract(copperTopPad, holeCut)
@@ -514,79 +506,86 @@ export const platedHole = (
     const barrelMargin = 0.03
 
     // Helper function to create a rotated pill section
-    const createRotatedPillSection = (
-      width: number,
-      height: number,
-      thickness: number,
-      centerX: number,
-      centerY: number,
-      centerZ: number,
-      rotationRad: number,
-    ) => {
+    const createRotatedPillSection = ({
+      width,
+      height,
+      thickness,
+      center,
+      rotationRad,
+    }: {
+      width: number
+      height: number
+      thickness: number
+      center: [number, number, number]
+      rotationRad: number
+    }) => {
       const radius = height / 2
       const length = Math.abs(width - height)
 
       if (length <= 1e-6) {
         return cylinder({
-          center: [centerX, centerY, centerZ],
+          center,
           radius,
           height: thickness,
         })
       }
 
       const rect = cuboid({
-        center: [0, 0, centerZ],
+        center: [0, 0, center[2]],
         size: [length, height, thickness],
       })
 
       const leftCap = cylinder({
-        center: [-length / 2, 0, centerZ],
+        center: [-length / 2, 0, center[2]],
         radius,
         height: thickness,
       })
 
       const rightCap = cylinder({
-        center: [length / 2, 0, centerZ],
+        center: [length / 2, 0, center[2]],
         radius,
         height: thickness,
       })
 
       const pillUnion = union(rect, leftCap, rightCap)
       const rotated = rotateZ(rotationRad, pillUnion)
-      return translate([centerX, centerY, 0], rotated)
+      return translate([center[0], center[1], 0], rotated)
     }
 
     // --- Barrel (rotated) ---
-    const barrel = createRotatedPillSection(
-      holeWidth + 2 * barrelMargin,
-      holeHeight + 2 * barrelMargin,
-      copperSpan,
-      plated_hole.x + holeOffsetX,
-      plated_hole.y + holeOffsetY,
-      0,
-      holeRotationRad,
-    )
+    const barrel = createRotatedPillSection({
+      width: holeWidth + 2 * barrelMargin,
+      height: holeHeight + 2 * barrelMargin,
+      thickness: copperSpan,
+      center: [plated_hole.x + holeOffsetX, plated_hole.y + holeOffsetY, 0],
+      rotationRad: holeRotationRad,
+    })
 
     // --- Hole cutout (rotated) ---
-    const holeCut = createRotatedPillSection(
-      holeWidth,
-      holeHeight,
-      throughDrillHeight * 1.1,
-      plated_hole.x + holeOffsetX,
-      plated_hole.y + holeOffsetY,
-      0,
-      holeRotationRad,
-    )
+    const holeCut = createRotatedPillSection({
+      width: holeWidth,
+      height: holeHeight,
+      thickness: throughDrillHeight * 1.1,
+      center: [plated_hole.x + holeOffsetX, plated_hole.y + holeOffsetY, 0],
+      rotationRad: holeRotationRad,
+    })
 
     // --- Pads and fill (rotated) ---
-    const createRotatedRectPadGeom = (
-      width: number,
-      height: number,
-      thickness: number,
-      center: [number, number, number],
-      borderRadius: number | null | undefined,
-      rotationRad: number,
-    ) => {
+    const createRotatedRectPadGeom = ({
+      width,
+      height,
+      thickness,
+      center,
+      borderRadius,
+      rotationRad,
+    }: {
+      width: number
+      height: number
+      thickness: number
+      center: [number, number, number]
+      borderRadius: number | null | undefined
+      rotationRad: number
+    }) => {
       const clampedRadius = clampRectBorderRadius(width, height, borderRadius)
 
       let rect2d
@@ -612,39 +611,40 @@ export const platedHole = (
       }
     }
 
-    const copperTopPad = createRotatedRectPadGeom(
-      padWidth,
-      padHeight,
-      platedHoleLipHeight,
-      [plated_hole.x, plated_hole.y, topSurfaceZ],
-      rectBorderRadius,
-      padRotationRad,
-    )
+    const copperTopPad = createRotatedRectPadGeom({
+      width: padWidth,
+      height: padHeight,
+      thickness: platedHoleLipHeight,
+      center: [plated_hole.x, plated_hole.y, topSurfaceZ],
+      borderRadius: rectBorderRadius,
+      rotationRad: padRotationRad,
+    })
 
-    const copperBottomPad = createRotatedRectPadGeom(
-      padWidth,
-      padHeight,
-      platedHoleLipHeight,
-      [plated_hole.x, plated_hole.y, bottomSurfaceZ],
-      rectBorderRadius,
-      padRotationRad,
-    )
+    const copperBottomPad = createRotatedRectPadGeom({
+      width: padWidth,
+      height: padHeight,
+      thickness: platedHoleLipHeight,
+      center: [plated_hole.x, plated_hole.y, bottomSurfaceZ],
+      borderRadius: rectBorderRadius,
+      rotationRad: padRotationRad,
+    })
 
-    const copperFill = (() => {
-      const height = Math.max(copperSpan - platedHoleLipHeight * 2, M)
-      const topPadBottom = topSurfaceZ
-      const bottomPadTop = bottomSurfaceZ
-      const centerZ = (topPadBottom + bottomPadTop) / 2
-      const rect2d = roundedRectangle({
-        size: [padWidth, padHeight],
-        roundRadius: rectBorderRadius || 0,
-        segments: RECT_PAD_SEGMENTS,
-      })
-      const extruded = extrudeLinear({ height }, rect2d)
-      const translated = translate([0, 0, centerZ - height / 2], extruded)
-      const rotated = rotateZ(padRotationRad, translated)
-      return translate([plated_hole.x, plated_hole.y, 0], rotated)
-    })()
+    const copperFillHeight = Math.max(copperSpan - platedHoleLipHeight * 2, M)
+    const copperFillCenterZ = (topSurfaceZ + bottomSurfaceZ) / 2
+    const copperFill2d = roundedRectangle({
+      size: [padWidth, padHeight],
+      roundRadius: rectBorderRadius || 0,
+      segments: RECT_PAD_SEGMENTS,
+    })
+    const copperFillTranslated = translate(
+      [0, 0, copperFillCenterZ - copperFillHeight / 2],
+      extrudeLinear({ height: copperFillHeight }, copperFill2d),
+    )
+    const copperFillRotated = rotateZ(padRotationRad, copperFillTranslated)
+    const copperFill = translate(
+      [plated_hole.x, plated_hole.y, 0],
+      copperFillRotated,
+    )
 
     // --- Cut pads with the hole ---
     const copperTopPadCut = subtract(copperTopPad, holeCut)
@@ -652,15 +652,13 @@ export const platedHole = (
     const copperFillCut = subtract(copperFill, holeCut)
 
     // --- Barrel internal cut (keeps thin copper rim) ---
-    const barrelHoleCut = createRotatedPillSection(
-      holeWidth - 2 * M,
-      holeHeight - 2 * M,
-      throughDrillHeight * 1.1,
-      plated_hole.x + holeOffsetX,
-      plated_hole.y + holeOffsetY,
-      0,
-      holeRotationRad,
-    )
+    const barrelHoleCut = createRotatedPillSection({
+      width: holeWidth - 2 * M,
+      height: holeHeight - 2 * M,
+      thickness: throughDrillHeight * 1.1,
+      center: [plated_hole.x + holeOffsetX, plated_hole.y + holeOffsetY, 0],
+      rotationRad: holeRotationRad,
+    })
 
     const barrelWithHole = subtract(barrel, barrelHoleCut)
 
