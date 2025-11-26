@@ -4,13 +4,17 @@ import { useMemo, useState, useCallback } from "react"
 import { useStlsFromGeom } from "./hooks/use-stls-from-geom"
 import { CadViewerContainer } from "./CadViewerContainer"
 import { MixedStlModel } from "./three-components/MixedStlModel"
-import { Euler } from "three"
+import { MathUtils, Quaternion, Vector3 } from "three"
 import { GltfModel } from "./three-components/GltfModel"
 import { JscadModel } from "./three-components/JscadModel"
 import { FootprinterModel } from "./three-components/FootprinterModel"
 import { tuple } from "./utils/tuple"
 import { Html } from "./react-three/Html"
 import { useLayerVisibility } from "./contexts/LayerVisibilityContext"
+
+const AXIS_X = new Vector3(1, 0, 0)
+const AXIS_Y = new Vector3(0, 1, 0)
+const AXIS_Z = new Vector3(0, 0, 1)
 
 export const AnyCadComponent = ({
   cad_component,
@@ -53,13 +57,54 @@ export const AnyCadComponent = ({
     cad_component.model_wrl_url ??
     cad_component.model_stl_url
   const gltfUrl = cad_component.model_glb_url ?? cad_component.model_gltf_url
-  const rotationOffset = cad_component.rotation
+  const rotationValues = useMemo(() => {
+    if (!cad_component.rotation) return null
+
+    const parseRotationDeg = (value: unknown) => {
+      if (typeof value === "number") return value
+      if (typeof value === "string") {
+        const match = value.match(/-?\d+(?:\.\d+)?/)
+        if (match) return parseFloat(match[0])
+      }
+      return 0
+    }
+
+    return {
+      x: parseRotationDeg((cad_component.rotation as any).x),
+      y: parseRotationDeg((cad_component.rotation as any).y),
+      z: parseRotationDeg((cad_component.rotation as any).z),
+    }
+  }, [cad_component.rotation])
+
+  const rotationOffset = rotationValues
     ? tuple(
-        (cad_component.rotation.x * Math.PI) / 180,
-        (cad_component.rotation.y * Math.PI) / 180,
-        (cad_component.rotation.z * Math.PI) / 180,
+        MathUtils.degToRad(rotationValues.x),
+        MathUtils.degToRad(rotationValues.y),
+        MathUtils.degToRad(rotationValues.z),
       )
     : undefined
+
+  const rotationQuaternion = useMemo(() => {
+    if (!rotationValues) return undefined
+
+    const { x = 0, y = 0, z = 0 } = rotationValues
+    if (!x && !y && !z) return undefined
+
+    const quaternion = new Quaternion()
+
+    const applyRotation = (axis: Vector3, angleDeg: number) => {
+      if (!angleDeg) return
+      const angleRad = MathUtils.degToRad(angleDeg)
+      const axisRotation = new Quaternion().setFromAxisAngle(axis, angleRad)
+      quaternion.multiply(axisRotation)
+    }
+
+    applyRotation(AXIS_Z, z)
+    applyRotation(AXIS_Y, y)
+    applyRotation(AXIS_X, x)
+
+    return quaternion
+  }, [rotationValues])
 
   let modelComponent: React.ReactNode = null
 
@@ -78,6 +123,7 @@ export const AnyCadComponent = ({
             : undefined
         }
         rotation={rotationOffset}
+        rotationQuaternion={rotationQuaternion}
         scale={cad_component.model_unit_to_mm_scale_factor}
         onHover={handleHover}
         onUnhover={handleUnhover}
@@ -99,6 +145,7 @@ export const AnyCadComponent = ({
             : undefined
         }
         rotation={rotationOffset}
+        rotationQuaternion={rotationQuaternion}
         scale={cad_component.model_unit_to_mm_scale_factor}
         onHover={handleHover}
         onUnhover={handleUnhover}
@@ -111,6 +158,7 @@ export const AnyCadComponent = ({
         key={cad_component.cad_component_id}
         jscadPlan={cad_component.model_jscad as any}
         rotationOffset={rotationOffset}
+        rotationQuaternion={rotationQuaternion}
         scale={cad_component.model_unit_to_mm_scale_factor}
         onHover={handleHover}
         onUnhover={handleUnhover}
@@ -130,6 +178,7 @@ export const AnyCadComponent = ({
             : undefined
         }
         rotationOffset={rotationOffset}
+        rotationQuaternion={rotationQuaternion}
         footprint={cad_component.footprinter_string}
         scale={cad_component.model_unit_to_mm_scale_factor}
         onHover={handleHover}

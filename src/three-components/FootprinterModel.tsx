@@ -12,6 +12,7 @@ export const FootprinterModel = ({
   positionOffset,
   footprint,
   rotationOffset,
+  rotationQuaternion,
   onHover,
   onUnhover,
   isHovered,
@@ -19,7 +20,8 @@ export const FootprinterModel = ({
 }: {
   positionOffset: any
   footprint: string
-  rotationOffset?: [number, number, number]
+  rotationOffset?: [number, number, number] | THREE.Euler
+  rotationQuaternion?: THREE.Quaternion
   onHover: (e: any) => void
   onUnhover: () => void
   isHovered: boolean
@@ -64,16 +66,34 @@ export const FootprinterModel = ({
   useEffect(() => {
     if (!group) return
     if (positionOffset) group.position.fromArray(positionOffset)
-    if (rotationOffset) group.rotation.fromArray(rotationOffset)
+    if (rotationQuaternion) {
+      group.quaternion.copy(rotationQuaternion)
+    } else if (rotationOffset) {
+      if (Array.isArray(rotationOffset)) {
+        group.rotation.fromArray(rotationOffset)
+      } else {
+        group.rotation.copy(rotationOffset as THREE.Euler)
+      }
+    }
     if (scale !== undefined) group.scale.setScalar(scale)
   }, [
     group,
     positionOffset?.[0],
     positionOffset?.[1],
     positionOffset?.[2],
-    rotationOffset?.[0],
-    rotationOffset?.[1],
-    rotationOffset?.[2],
+    rotationQuaternion?.x,
+    rotationQuaternion?.y,
+    rotationQuaternion?.z,
+    rotationQuaternion?.w,
+    Array.isArray(rotationOffset)
+      ? rotationOffset[0]
+      : (rotationOffset as THREE.Euler | undefined)?.x,
+    Array.isArray(rotationOffset)
+      ? rotationOffset[1]
+      : (rotationOffset as THREE.Euler | undefined)?.y,
+    Array.isArray(rotationOffset)
+      ? rotationOffset[2]
+      : (rotationOffset as THREE.Euler | undefined)?.z,
     scale,
   ])
 
