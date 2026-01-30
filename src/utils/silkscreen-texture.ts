@@ -56,7 +56,7 @@ export function createSilkscreenTextureForLayer({
   const pcbSilkscreenPaths = su(circuitJson).pcb_silkscreen_path.list()
   const pcbSilkscreenLines = su(circuitJson).pcb_silkscreen_line.list()
   const pcbSilkscreenRects = su(circuitJson).pcb_silkscreen_rect.list()
-  const pcbSilkscreenCircles = su(circuitJson).pcb_silkscreen_oval.list()
+  const pcbSilkscreenCircles = su(circuitJson).pcb_silkscreen_circle.list()
   const pcbFabricationNoteRects =
     su(circuitJson).pcb_fabrication_note_rect.list()
   const pcbNoteLines = su(circuitJson).pcb_note_line.list()
